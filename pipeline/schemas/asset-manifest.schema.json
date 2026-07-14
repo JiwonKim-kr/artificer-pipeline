@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Asset Manifest",
+  "description": "트랙 간 유기적 연결의 단일 기록. play build가 등록하고 art reskin / se attach가 소비하며 verify가 정합성을 검사한다.",
+  "type": "object",
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "style_guide": {
+      "description": "art lock으로 고정된 스타일 가이드 문서 경로. 잠기기 전에는 null.",
+      "type": ["string", "null"]
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/entry" }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "track", "status", "spec", "requested_by"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "고유 ID. 형식: <track>:<카테고리>/<이름> (conventions.md 참조)",
+          "pattern": "^(art|se|bgm|text):[a-z0-9_/]+$"
+        },
+        "track": { "enum": ["art", "se", "bgm", "text"] },
+        "status": {
+          "enum": ["placeholder", "generated", "approved", "rejected"],
+          "description": "placeholder: play build가 등록 / generated: 생성 완료·검수 대기 / approved: 검수 통과·반영됨 / rejected: 반려(피드백 참조 후 재생성)"
+        },
+        "spec": {
+          "type": "string",
+          "description": "에셋 요구 명세 (자연어). 생성 명령이 프롬프트의 기반으로 사용"
+        },
+        "requested_by": {
+          "type": "array",
+          "description": "이 에셋을 필요로 하는 지점 목록",
+          "items": {
+            "type": "object",
+            "required": ["kind", "path"],
+            "properties": {
+              "kind": { "enum": ["scene_node", "code_event", "ui", "doc"] },
+              "path": {
+                "type": "string",
+                "description": "예: scenes/enemy.tscn::Slime/Sprite2D 또는 src/core/player.gd::on_jump"
+              }
+            }
+          }
+        },
+        "file": {
+          "type": ["string", "null"],
+          "description": "현재 반영된 실제 파일 경로. placeholder 상태에서는 플레이스홀더 파일 경로"
+        },
+        "lore_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "참조한 lore/canon 항목 경로. 정본 모순 검사에 사용"
+        },
+        "params": {
+          "type": "object",
+          "description": "트랙별 부가 규격 (예: art의 프레임 크기, se의 길이 제한)"
+        },
+        "history": {
+          "type": "array",
+          "description": "생성/반려 이력",
+          "items": {
+            "type": "object",
+            "properties": {
+              "at": { "type": "string", "format": "date-time" },
+              "action": { "enum": ["registered", "generated", "approved", "rejected"] },
+              "feedback": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
