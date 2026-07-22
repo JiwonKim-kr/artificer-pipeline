@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
+
+[node name="Main" type="Node2D"]
+
+[node name="TileMapLayer" type="TileMapLayer" parent="."]
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+tile_size = 16
+map_size = Vector2i(9, 9)
+blocked_cells = Array[Vector2i]([Vector2i(4, 4), Vector2i(4, 5), Vector2i(5, 4)])
+start_cell = Vector2i(1, 1)
+move_duration = 0.12

@@ -1,5 +1,63 @@
 {
   "version": 1,
   "style_guide": null,
-  "entries": []
+  "entries": [
+    {
+      "id": "art:player/player_idle",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "플레이어 대기 스프라이트. 정면 1프레임, 타일 크기에 맞는 정사각",
+      "requested_by": [
+        {
+          "kind": "scene_node",
+          "path": "scenes/player.tscn::Player/Sprite2D"
+        }
+      ],
+      "file": "assets/art/sprites/player/PLACEHOLDER_player_idle.png",
+      "history": [
+        {
+          "at": "2026-07-14T05:28:39.603412+00:00",
+          "action": "registered"
+        }
+      ]
+    },
+    {
+      "id": "art:tiles/floor",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "바닥 타일 1종. 그리드 배경",
+      "requested_by": [
+        {
+          "kind": "scene_node",
+          "path": "scenes/main.tscn::TileMapLayer"
+        }
+      ],
+      "file": "assets/art/sprites/tiles/PLACEHOLDER_floor.png",
+      "history": [
+        {
+          "at": "2026-07-14T05:28:39.643625+00:00",
+          "action": "registered"
+        }
+      ]
+    },
+    {
+      "id": "se:player_step",
+      "track": "se",
+      "status": "placeholder",
+      "spec": "한 칸 이동 완료 시 발소리 효과음",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/player.gd::on_step_complete"
+        }
+      ],
+      "file": "assets/audio/se/PLACEHOLDER_player_step.ogg",
+      "history": [
+        {
+          "at": "2026-07-14T05:28:39.676450+00:00",
+          "action": "registered"
+        }
+      ]
+    }
+  ]
 }
