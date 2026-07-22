@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "style_guide": null,
+  "entries": [
+    {
+      "id": "art:player/player_idle",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "동일 ID 두 번째 등록 — 유일성 규칙 위반 유도. (검증용 fixture)",
+      "requested_by": [
+        { "kind": "scene_node", "path": "scenes/player.tscn::Player/Sprite2D" }
+      ]
+    },
+    {
+      "id": "art:player/player_idle",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "중복 ID.",
+      "requested_by": [
+        { "kind": "scene_node", "path": "scenes/enemy.tscn::Enemy/Sprite2D" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "style_guide": null,
+  "entries": [
+    {
+      "id": "se:player/player_idle",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "ID prefix(se) 가 track(art) 와 불일치. 도메인 규칙 위반. (검증용 fixture)",
+      "requested_by": [
+        { "kind": "scene_node", "path": "scenes/player.tscn::Player/Sprite2D" }
+      ]
+    }
+  ]
+}

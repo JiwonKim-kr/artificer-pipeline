@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "style_guide": null,
+  "entries": [
+    {
+      "id": "art:player/player_idle",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "플레이어 대기 상태 스프라이트. 정면 1프레임. (검증용 fixture, 실데이터 아님)",
+      "requested_by": [
+        { "kind": "scene_node", "path": "scenes/player.tscn::Player/Sprite2D" }
+      ],
+      "file": "assets/art/sprites/player/PLACEHOLDER_player_idle.png",
+      "lore_refs": [],
+      "history": [
+        { "at": "2026-07-14T00:00:00+00:00", "action": "registered" }
+      ]
+    },
+    {
+      "id": "se:player_step",
+      "track": "se",
+      "status": "placeholder",
+      "spec": "플레이어 이동 발소리 효과음.",
+      "requested_by": [
+        { "kind": "code_event", "path": "src/core/player.gd::on_move" }
+      ],
+      "file": null
+    }
+  ]
+}

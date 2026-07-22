@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "style_guide": null,
+  "entries": [
+    {
+      "id": "art:player/player_idle",
+      "track": "art",
+      "status": "pending",
+      "spec": "status 가 enum(placeholder|generated|approved|rejected) 밖. (검증용 fixture)",
+      "requested_by": [
+        { "kind": "scene_node", "path": "scenes/player.tscn::Player/Sprite2D" }
+      ]
+    }
+  ]
+}

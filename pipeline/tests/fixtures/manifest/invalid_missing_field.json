@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "style_guide": null,
+  "entries": [
+    {
+      "id": "art:player/player_idle",
+      "track": "art",
+      "status": "placeholder",
+      "requested_by": [
+        { "kind": "scene_node", "path": "scenes/player.tscn::Player/Sprite2D" }
+      ]
+    }
+  ]
+}

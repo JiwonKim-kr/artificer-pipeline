@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "style_guide": null,
+  "entries": [
+    {
+      "id": "art:Player/Idle",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "ID 에 대문자가 포함되어 패턴 위반. (검증용 fixture)",
+      "requested_by": [
+        { "kind": "scene_node", "path": "scenes/player.tscn::Player/Sprite2D" }
+      ]
+    }
+  ]
+}
