@@ -1,0 +1,88 @@
+# CI — 검증 게이트 (verify) 자동 실행
+#
+# HANDOFF §2: CI 는 Phase 4 에서 GitHub Actions 로 도입한다(Phase 2 로컬 verify 의
+# 자동화판). push/PR 마다 로컬 `verify.py --full` 과 동일한 게이트 + 러너 전부를
+# ubuntu-latest 에서 재검증한다.
+#
+# 이 워크플로는 GitHub 러너에서만 실행되므로 로컬에서 검증할 수 없다.
+# ⚠️ 첫 push(또는 PR)에서 실제로 초록불이 뜨는지 확인이 필요하다. 특히:
+#   - Godot 4.6.3 headless 다운로드 URL/파일명 (godot-builds 릴리스 자산명)
+#   - ubuntu 의 ffmpeg 가 libvorbis 를 포함하는지 (se_post 정규화 경로)
+#   - npm ci 가 se_node 락파일로 재현되는지
+# 비표준 GitHub 편법은 쓰지 않는다 — 공식/광범위 사용 액션만 사용한다.
+
+name: verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.6.3"
+      # 다운로드한 Godot headless 바이너리 경로 (아래 스텝에서 채운다)
+      GODOT_BIN: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: pipeline/scripts/se_node/package-lock.json
+
+      - name: Install ffmpeg (apt)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          # se_post 정규화는 libvorbis 인코더가 필요하다(없으면 se_post 가 wasm 폴백).
+          ffmpeg -hide_banner -encoders 2>/dev/null | grep -i vorbis || true
+
+      # Godot 4.6.3 headless(linux x86_64)를 godot-builds 릴리스에서 받아 캐시한다.
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot (cache miss)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot-bin
+          BASE="https://github.com/godotengine/godot-builds/releases/download"
+          ZIP="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fL "${BASE}/${GODOT_VERSION}-stable/${ZIP}" -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d ~/godot-bin
+          # 압축 내부 바이너리를 안정된 이름(godot)으로 표준화한다.
+          mv ~/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot-bin/godot
+          chmod +x ~/godot-bin/godot
+
+      - name: Register Godot on PATH
+        run: |
+          echo "$HOME/godot-bin" >> "$GITHUB_PATH"
+          echo "GODOT_BIN=$HOME/godot-bin/godot" >> "$GITHUB_ENV"
+
+      - name: Godot version
+        run: godot --version
+
+      - name: Install jsfxr backend (npm ci)
+        working-directory: pipeline/scripts/se_node
+        run: npm ci
+
+      # 로컬 `verify` 와 동일한 통합 게이트 + 러너 전부.
+      # verify.py --full: 게이트 1~5 + pipeline/tests/run_*.py 전 러너
+      # (자식 러너 실행 시 ARTIFICER_IN_VERIFY_FULL 가드로 무한 재귀 방지).
+      - name: Run verify --full
+        run: python3 pipeline/scripts/verify.py --full
