@@ -1,0 +1,51 @@
+; Engine configuration file.
+; artificer-pipeline — Godot 프로젝트 (Phase 2, play 트랙 인프라)
+;
+; 이 파일은 에디터 UI로 편집하는 것이 원칙이나, 파이프라인 초기화 단계에서는
+; 최소 설정만 수기로 둔다. 게임 제목은 아직 미정이므로 config/name 은
+; 저장소 이름 기준의 중립값을 사용한다 (HANDOFF §2: 검증 대상 게임은
+; 로그라이크/픽셀아트지만 파이프라인·프로젝트에는 하드코딩하지 않는다).
+;
+; Godot 4.6.x 고정 (CLAUDE.md 코딩 규칙). config_version=5 는 Godot 4.x 형식.
+; 메인 씬(application/run/main_scene)은 play build(player_movement)에서 설정됨.
+
+config_version=5
+
+[application]
+
+config/name="artificer-pipeline"
+config/description="AI 오케스트레이션 파이프라인 검증용 Godot 프로젝트. 게임 제목 미정."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.6")
+
+[debug]
+
+gdscript/warnings/untyped_declaration=1
+
+[input]
+
+; play build(player_movement)이 정의한 4방향 이동 입력. 화살표 + WASD.
+move_up={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194320,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":87,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+move_down={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194322,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":83,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+move_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194319,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":65,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+move_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194321,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
