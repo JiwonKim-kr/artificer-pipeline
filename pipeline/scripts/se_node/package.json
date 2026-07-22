@@ -1,0 +1,17 @@
+{
+  "name": "artificer-se-jsfxr",
+  "version": "1.0.0",
+  "private": true,
+  "description": "se 트랙 jsfxr(절차적 SE) 백엔드 — 파라미터 JSON → WAV 렌더러. Python 래퍼는 pipeline/scripts/se_jsfxr.py",
+  "main": "render_sfxr.js",
+  "scripts": {
+    "render": "node render_sfxr.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "jsfxr": "1.4.1",
+    "wasm-media-encoders": "0.7.0"
+  }
+}
