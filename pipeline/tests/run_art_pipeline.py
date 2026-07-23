@@ -25,11 +25,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
-import zlib
 from pathlib import Path
 
 TESTS_DIR = Path(__file__).resolve().parent
@@ -40,6 +38,7 @@ sys.path.insert(0, str(SCRIPTS))
 import env_config as env_mod  # noqa: E402
 import scenario_client as sc  # noqa: E402
 import art_reskin as reskin_mod  # noqa: E402
+import placeholder_gen  # noqa: E402
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -63,27 +62,13 @@ def _have_ffmpeg() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# stdlib PNG 생성기 (Phase 2 가 placeholder PNG 를 stdlib 로 만든 방식과 동일 취지)
+# stdlib PNG 생성기 — 구현은 pipeline/scripts/placeholder_gen.py 로 일원화했다.
+# (예전에는 이 파일이 zlib/struct 로 직접 PNG 를 썼다. 동일 로직이 두 곳에
+#  존재하지 않도록 정본 구현을 생성기 쪽에 두고 여기서는 얇게 위임한다.)
 # ---------------------------------------------------------------------------
 def write_png(path: Path, w: int, h: int, pixel) -> None:
     """8-bit RGBA PNG 를 stdlib 만으로 기록. pixel(x,y)->(r,g,b,a)."""
-    raw = bytearray()
-    for y in range(h):
-        raw.append(0)  # filter type 0
-        for x in range(w):
-            raw.extend(pixel(x, y))
-
-    def chunk(tag: bytes, data: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(data)) + tag + data
-            + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-        )
-
-    ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)  # 6 = truecolor+alpha
-    idat = zlib.compress(bytes(raw), 9)
-    path.write_bytes(
-        b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
-    )
+    placeholder_gen.write_rgba_png(path, w, h, pixel)
 
 
 def _bordered(color: tuple[int, int, int], size: int):

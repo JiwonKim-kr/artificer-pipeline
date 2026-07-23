@@ -63,11 +63,19 @@
 - placeholder 에셋 파일: `PLACEHOLDER_<이름>` 접두사, 규칙 경로(`assets/art/...`, `assets/audio/...`).
 - 매니페스트 entry: **`manifest.py add` 로만** 등록. `requested_by` 에 **씬 노드 경로**(`kind=scene_node`, `path=scenes/<씬>.tscn::<노드경로>`) 또는 코드 이벤트 지점을 기록한다.
 
+**플레이스홀더 이미지 = `placeholder_gen.py` 경유 (정식 중간 산출물)**
+
+- 이미지 플레이스홀더는 **`pipeline/scripts/placeholder_gen.py` 로만** 만든다. 커맨드 프롬프트가 즉석 스크립트로 단색 PNG 를 찍어내지 않는다(생성 로직 단일화·결정성).
+- 목적은 "아트 없이도 화면만 보고 게임을 판정"하는 것이다. 글리프(문자)+색+테두리로 **서로 다른 엔티티가 시각적으로 구분**돼야 하며, 어떤 글리프/색을 쓸지는 spec·lore **데이터**에서 판단한다(장르 대응표를 커맨드/코드에 하드코딩하지 않는다).
+- 산출물은 RGBA PNG + `PLACEHOLDER_` 접두사 + Sprite2D 텍스처 구조를 그대로 지키므로, 예산이 생기면 `art reskin` 이 동일 경로의 실제 에셋으로 교체한다(**재작업 0**).
+- 스크립트는 **매니페스트를 쓰지 않는다** — 등록 창구는 `manifest.py` 뿐이다(원칙 3). 확대·시트 패킹·규격 검사는 `art_post.py`(resize/pack/probe)가 담당한다(역할 분담: 생성=placeholder_gen, 가공/검사=art_post).
+- 디렉토리 규칙상 `assets/art/` 쓰기는 원칙적으로 `art gen` 몫이지만, **`play build` 의 `PLACEHOLDER_` 배치는 명시적 예외**다(CLAUDE.md 코딩 규칙 「플레이스홀더 에셋은 접두사 + 매니페스트 등록 필수」).
+
 **처리 플로우**:
-1. **생성**: spec 의 대상 파일/수용 기준에 따라 GDScript·씬을 구현하고, 필요한 에셋 자리에 placeholder 를 배치한다.
+1. **생성**: spec 의 대상 파일/수용 기준에 따라 GDScript·씬을 구현하고, 필요한 에셋 자리에 placeholder 를 배치한다. 이미지 placeholder 는 `python3 pipeline/scripts/placeholder_gen.py --glyph <문자> --fg <색> [--bg ...] [--border ...] --output <PLACEHOLDER_ 경로> --preview` 로 만들고, `--preview` 픽셀 맵과 경고 유무로 판독성을 확인한다.
 2. **매니페스트 등록**: 각 placeholder 를 `python3 pipeline/scripts/manifest.py add --id <track>:<카테고리>/<이름> --track <...> --status placeholder --spec "<요구 명세>" --requested-by "scene_node:scenes/<씬>.tscn::<노드>" --file "<placeholder 경로>"` 로 등록한다. 검증 실패 시 매니페스트는 쓰이지 않으므로 오류를 해소한 뒤 재시도한다.
 3. **자동 검증**: `play test` 를 실행해 임포트·스모크·매니페스트 정합성을 확인한다.
-4. **사람 검수/반영**: 변경 요약과 `play test` 결과를 제시한다. `src/core/` 변경 커밋 본문에는 **승인된 spec 문서 경로를 명시**한다. (docs/conventions.md 커밋 규칙 — 커밋은 사용자 승인 후.)
+4. **사람 검수/반영**: 변경 요약(플레이스홀더 글리프/색 요약표 포함)과 `play test` 결과를 제시한다. `src/core/` 변경 커밋 본문에는 **승인된 spec 문서 경로를 명시**한다. (docs/conventions.md 커밋 규칙 — 커밋은 사용자 승인 후.)
 
 ## `play test`
 
@@ -102,8 +110,10 @@
 | `.claude/commands/play-build.md` | `/play-build` 진입점 |
 | `.claude/commands/play-test.md` | `/play-test` 진입점 |
 | `pipeline/scripts/manifest.py` | 매니페스트 읽기/쓰기 유일 창구 (스키마 검증 후 쓰기). CLI: validate/add/update-status/list |
+| `pipeline/scripts/placeholder_gen.py` | 플레이스홀더 이미지 생성 유일 창구 (stdlib, 결정적, 5x7 글리프). 매니페스트는 쓰지 않음 |
 | `pipeline/scripts/play_test.py` | 임포트 + 스모크 + 매니페스트 정합성 러너 |
 | `pipeline/tests/smoke_test.gd` | 스모크 테스트 (SceneTree 스크립트) |
 | `pipeline/tests/fixtures/manifest/` | 매니페스트 검증 fixture (정본 아님). valid + 유형별 invalid |
 | `pipeline/tests/run_play_pipeline.py` | manifest 검증·쓰기 + play_test 러너 자동 테스트 |
+| `pipeline/tests/run_placeholder_pipeline.py` | placeholder_gen 자동 테스트 (결정성·규격·Godot 임포트·reskin 호환) |
 | `docs/specs/<기능>.md` | play spec 산출물. `status: draft → approved` |
