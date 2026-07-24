@@ -7,3 +7,5 @@ __pycache__/
 *.pyc
 node_modules/
 .claude/settings.local.json
+# play test --screenshot 시각 스테이지 산출물(렌더 PNG). 저장소를 더럽히지 않게 제외.
+pipeline/artifacts/

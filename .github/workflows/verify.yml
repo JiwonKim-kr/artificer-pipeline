@@ -16,6 +16,7 @@ name: verify
 on:
   push:
   pull_request:
+  workflow_dispatch:   # 아래 visual(스크린샷) job 을 수동으로 트리거하기 위함
 
 jobs:
   verify:
@@ -84,5 +85,85 @@ jobs:
       # 로컬 `verify` 와 동일한 통합 게이트 + 러너 전부.
       # verify.py --full: 게이트 1~5 + pipeline/tests/run_*.py 전 러너
       # (자식 러너 실행 시 ARTIFICER_IN_VERIFY_FULL 가드로 무한 재귀 방지).
+      #
+      # 주: play test 의 스크린샷(시각) 스테이지는 옵트인(--screenshot)이라
+      # 여기서 실행되지 않는다. 실제 렌더는 무겁고 GUI/xvfb 가 필요하므로
+      # 기본 게이트를 느리게/불안정하게 만들지 않도록 아래 별도 visual job 으로 분리했다.
       - name: Run verify --full
         run: python3 pipeline/scripts/verify.py --full
+
+  # ---------------------------------------------------------------------------
+  # visual — play test 스크린샷(시각) 스테이지 전용 job.
+  #
+  # 왜 별도 job + 수동 트리거(workflow_dispatch)인가:
+  #   - 실제 렌더는 headless 불가라 xvfb 가상 디스플레이 + Mesa GL 이 필요하고,
+  #     소프트웨어 렌더라 느리며 GPU/드라이버 환경에 따라 불안정할 수 있다.
+  #   - push/PR 마다 도는 기본 verify 게이트의 속도·안정성을 해치지 않도록
+  #     분리하고, 필요할 때(Actions 탭 → Run workflow)만 수동으로 돌린다.
+  #
+  # ⚠️ 이 job 은 로컬(macOS)에서 검증할 수 없다. Linux/xvfb 경로는 표준적으로
+  #    작성했으며 첫 수동 실행에서 실제로 통과하는지 확인이 필요하다. 특히:
+  #      - ubuntu 러너에서 xvfb + Mesa(llvmpipe) 소프트웨어 GL 로 opengl3 컨텍스트가 뜨는지
+  #      - Godot 이 xvfb-run 하위에서 뷰포트를 캡처하는지(SHOT_SAVED 마커)
+  #    실패 시 apt 패키지(libgl1-mesa-dri 등)나 LIBGL_ALWAYS_SOFTWARE 조정이 필요할 수 있다.
+  visual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.6.3"
+      # 소프트웨어 렌더(llvmpipe) 강제 — CI 러너에는 실제 GPU 가 없다.
+      LIBGL_ALWAYS_SOFTWARE: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 가상 디스플레이 + 소프트웨어 OpenGL(Mesa llvmpipe).
+      - name: Install xvfb + Mesa GL (apt)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri libglu1-mesa
+          xvfb-run --help >/dev/null && echo "xvfb-run OK"
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot (cache miss)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot-bin
+          BASE="https://github.com/godotengine/godot-builds/releases/download"
+          ZIP="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fL "${BASE}/${GODOT_VERSION}-stable/${ZIP}" -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d ~/godot-bin
+          mv ~/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot-bin/godot
+          chmod +x ~/godot-bin/godot
+
+      - name: Register Godot on PATH
+        run: |
+          echo "$HOME/godot-bin" >> "$GITHUB_PATH"
+          echo "GODOT_BIN=$HOME/godot-bin/godot" >> "$GITHUB_ENV"
+
+      # play_test.py 가 Linux 에서 스스로 xvfb-run 으로 래핑한다(플랫폼 감지).
+      # 출력 PNG 는 pipeline/artifacts/ (gitignore) 아래에 저장 후 아티팩트로 업로드.
+      - name: Run play test --screenshot
+        run: |
+          python3 pipeline/scripts/play_test.py --screenshot \
+            --shot-output pipeline/artifacts/main.png
+
+      - name: Upload screenshot artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-screenshot
+          path: pipeline/artifacts/*.png
+          if-no-files-found: warn

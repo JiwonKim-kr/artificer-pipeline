@@ -86,17 +86,26 @@
 **출력**: 스테이지별 PASS/FAIL 리포트. 종료 코드 0=통과, 1=실패, 2=러너 오류.
 
 **검사 스테이지** (`pipeline/scripts/play_test.py`):
-| 스테이지 | 내용 | verify 게이트 |
-|---|---|---|
-| Godot headless 임포트 | `godot --headless --path <repo> --import` 성공 | #1 |
-| 스모크 테스트 | `pipeline/tests/smoke_test.gd`(SceneTree) 로 부트/메인 씬 로드 무결성 | #2 |
-| 매니페스트 정합성 | 스키마 유효 + `file` 지정 entry 의 실제 파일 존재 | #4 |
+| 스테이지 | 내용 | verify 게이트 | 기본 |
+|---|---|---|---|
+| Godot headless 임포트 | `godot --headless --path <repo> --import` 성공 | #1 | O |
+| 스모크 테스트 | `pipeline/tests/smoke_test.gd`(SceneTree) 로 부트/메인 씬 로드 무결성 | #2 | O |
+| 스크린샷 (시각 렌더) | `pipeline/tests/screenshot.gd` 로 메인 씬을 **실제 렌더**해 PNG 저장 + 비-단색 검증 | — | **옵트인 `--screenshot`** |
+| 매니페스트 정합성 | 스키마 유효 + `file` 지정 entry 의 실제 파일 존재 | #4 | O |
 
 **단계적 설계**: 아직 씬이 없어도 각 스테이지가 의미 있게 동작한다. 스모크는 `application/run/main_scene` 미설정 시 부트/임포트만 확인하고 통과하며, `play build` 가 메인 씬을 설정하면 재실행만으로 로드/인스턴스화 검증이 활성화된다.
 
+**스크린샷(시각) 스테이지 — 옵트인, `--screenshot`**:
+- 스모크(게이트 #2)는 headless 로 "씬이 로드/인스턴스화되는가"만 본다. 스크린샷 스테이지는 "화면에 무엇이 보이는가"를 실제 렌더로 확인해 파이프라인의 "돌려보고 눈으로 확인" 공백을 메운다(장르 무관 범용 도구). 읽기 전용 관찰 — 씬을 렌더만 하고 게임 로직/데이터를 수정하지 않는다.
+- **headless 금지**: 순수 `--headless` 는 더미 렌더 드라이버라 뷰포트 캡처가 불가(무한 대기)하다. 그래서 이 스테이지만 비-headless 로 돈다.
+  - macOS/GUI: `--rendering-driver opengl3` 로 실제 렌더(창이 잠깐 뜸). Linux(CI/서버): `xvfb-run` 가상 디스플레이 필요.
+  - macOS 에는 `timeout` 명령이 없으므로 파이썬 subprocess 로 타임아웃(`--shot-timeout`, 기본 120s)과 프로세스 그룹 종료를 직접 처리한다(좀비/창 잔존 금지).
+- **검증**: 저장 PNG 의 존재·크기·해상도(IHDR) + **비-단색 여부**(순수 파이썬 PNG 디코드로 격자 샘플의 서로 다른 색 수를 세어 까만/빈 화면 감지; 엔진이 출력한 `SHOT_NONBLANK` 마커로 폴백). 산출물 기본 경로는 `pipeline/artifacts/screenshot.png`(`.gitignore` 처리, `--shot-output` 로 변경).
+- **왜 기본이 아닌가**: 실제 렌더는 무겁고 창이 뜨므로 기본 `play test`(빠른 headless)와 `verify`(기본 게이트)의 속도/CI 친화성을 해치지 않도록 옵트인으로 둔다.
+
 **처리 플로우**:
-1. **생성(실행)**: `python3 pipeline/scripts/play_test.py` 실행.
-2. **판단/보고**: 실패 스테이지가 있으면 원인(임포트 로그/스모크 출력/정합성 문제)을 제시하고 수정 후 재실행한다. (네이밍·디렉토리 규칙 검사와 lore 모순 검사는 상위 `verify` 명령 범위이며 이 러너 밖이다.)
+1. **생성(실행)**: `python3 pipeline/scripts/play_test.py` 실행. 시각 확인이 필요하면 `--screenshot` 을 붙인다.
+2. **판단/보고**: 실패 스테이지가 있으면 원인(임포트 로그/스모크 출력/정합성 문제/스크린샷 타임아웃·빈 렌더)을 제시하고 수정 후 재실행한다. 스크린샷 PASS 시 저장 PNG 경로를 사람에게 제시해 화면을 눈으로 판정하게 한다. (네이밍·디렉토리 규칙 검사와 lore 모순 검사는 상위 `verify` 명령 범위이며 이 러너 밖이다.)
 
 ---
 
@@ -111,8 +120,10 @@
 | `.claude/commands/play-test.md` | `/play-test` 진입점 |
 | `pipeline/scripts/manifest.py` | 매니페스트 읽기/쓰기 유일 창구 (스키마 검증 후 쓰기). CLI: validate/add/update-status/list |
 | `pipeline/scripts/placeholder_gen.py` | 플레이스홀더 이미지 생성 유일 창구 (stdlib, 결정적, 5x7 글리프). 매니페스트는 쓰지 않음 |
-| `pipeline/scripts/play_test.py` | 임포트 + 스모크 + 매니페스트 정합성 러너 |
+| `pipeline/scripts/play_test.py` | 임포트 + 스모크 + 매니페스트 정합성 러너 (+옵션 `--screenshot` 시각 스테이지) |
 | `pipeline/tests/smoke_test.gd` | 스모크 테스트 (SceneTree 스크립트) |
+| `pipeline/tests/screenshot.gd` | 스크린샷 캡처 (SceneTree 스크립트, 비-headless 실제 렌더 → PNG) |
+| `pipeline/artifacts/` | 스크린샷 등 렌더 산출물 (`.gitignore` 처리, 커밋 대상 아님) |
 | `pipeline/tests/fixtures/manifest/` | 매니페스트 검증 fixture (정본 아님). valid + 유형별 invalid |
 | `pipeline/tests/run_play_pipeline.py` | manifest 검증·쓰기 + play_test 러너 자동 테스트 |
 | `pipeline/tests/run_placeholder_pipeline.py` | placeholder_gen 자동 테스트 (결정성·규격·Godot 임포트·reskin 호환) |

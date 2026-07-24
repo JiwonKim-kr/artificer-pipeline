@@ -11,9 +11,15 @@ Phase 1 의 run_lore_roundtrip.py 와 같은 스타일(단일 파일·번호 섹
                               파일이 존재하면 통과하는지 확인.
   [4] play_test 엔드투엔드   : play_test.py 를 실제 프로젝트에 실행 →
                               임포트 + 스모크 + 매니페스트 정합성 전체 통과.
+  [5] 스크린샷 스테이지      : 순수 파이썬 헬퍼(PNG 디코드/빈 렌더 감지, 플랫폼별
+                              커맨드 구성) 단위 검증 + (옵트인) 실제 렌더 e2e.
 
 CLAUDE.md 규칙: 실데이터(pipeline/manifest.json)는 절대 수정하지 않는다.
 쓰기 검사는 전부 임시 사본/임시 디렉토리 대상.
+
+[5]의 실제 렌더 e2e 는 무겁고(GUI/xvfb) 창이 뜨므로 기본은 SKIP 이며
+환경변수 ARTIFICER_RUN_SCREENSHOT_RENDER=1 일 때만 실행한다. 이렇게 해서
+`verify.py --full`(CI 기본 게이트)이 이 러너를 자동 실행해도 느려지지 않는다.
 """
 from __future__ import annotations
 
@@ -23,6 +29,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 
 TESTS_DIR = Path(__file__).resolve().parent
@@ -201,6 +208,105 @@ def section_play_test_e2e() -> None:
     check("스모크 스테이지 PASS", "[PASS] 스모크 테스트" in r.stdout)
 
 
+def _write_png(path: Path, width: int, height: int, pixels: list[tuple[int, int, int, int]]) -> None:
+    """8-bit RGBA PNG 를 filter=None(0) 스캔라인으로 인코딩(테스트 픽스처용, stdlib 만)."""
+    raw = bytearray()
+    for y in range(height):
+        raw.append(0)  # 필터 타입 None
+        for x in range(width):
+            r, g, b, a = pixels[y * width + x]
+            raw += bytes((r & 0xFF, g & 0xFF, b & 0xFF, a & 0xFF))
+
+    def chunk(ctype: bytes, cdata: bytes) -> bytes:
+        return (len(cdata).to_bytes(4, "big") + ctype + cdata
+                + zlib.crc32(ctype + cdata).to_bytes(4, "big"))
+
+    ihdr = width.to_bytes(4, "big") + height.to_bytes(4, "big") + bytes((8, 6, 0, 0, 0))
+    png = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", ihdr)
+           + chunk(b"IDAT", zlib.compress(bytes(raw)))
+           + chunk(b"IEND", b""))
+    path.write_bytes(png)
+
+
+def section_screenshot_helpers() -> None:
+    print("\n[5] 스크린샷 스테이지 (순수 파이썬 헬퍼 단위 검증)")
+
+    # --- 플랫폼별 커맨드 구성: headless 금지 + macOS opengl3 / Linux xvfb-run ---
+    proj = REPO_ROOT
+    mac_cmd = play_test_mod.build_screenshot_cmd(
+        "godot", proj, Path("/tmp/shot.png"), None, 12, "darwin")
+    check("macOS 커맨드에 --headless 없음", "--headless" not in mac_cmd)
+    check("macOS 커맨드에 --rendering-driver opengl3", "opengl3" in mac_cmd)
+    check("macOS 커맨드에 xvfb-run 없음", "xvfb-run" not in mac_cmd)
+    check("macOS 커맨드에 스크린샷 스크립트", play_test_mod.SCREENSHOT_SCRIPT in mac_cmd)
+
+    lin_cmd = play_test_mod.build_screenshot_cmd(
+        "godot", proj, Path("/tmp/shot.png"), None, 12, "linux")
+    check("Linux 커맨드는 xvfb-run 으로 시작", lin_cmd[0] == "xvfb-run")
+    check("Linux 커맨드에 --headless 없음", "--headless" not in lin_cmd)
+    check("Linux 커맨드에도 opengl3", "opengl3" in lin_cmd)
+
+    scene_cmd = play_test_mod.build_screenshot_cmd(
+        "godot", proj, Path("/tmp/shot.png"), "res://scenes/x.tscn", 5, "darwin")
+    check("--scene 인자 전달됨", "res://scenes/x.tscn" in scene_cmd)
+    check("--frames 인자 전달됨", "5" in scene_cmd)
+
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+
+        # --- IHDR 해상도 파싱 ---
+        blank = tdp / "blank.png"
+        _write_png(blank, 8, 4, [(30, 30, 30, 255)] * 32)
+        check("_read_png_dimensions 8x4", play_test_mod._read_png_dimensions(blank) == (8, 4))
+
+        # --- 단색 PNG → distinct == 1 (빈/까만 화면 감지) ---
+        check("단색 PNG distinct==1", play_test_mod._png_distinct_sample(blank) == 1)
+
+        # --- 색이 섞인 PNG → distinct >= 2 ---
+        px = [(30, 30, 30, 255)] * 32
+        px[10] = (200, 50, 50, 255)
+        px[20] = (50, 200, 50, 255)
+        multi = tdp / "multi.png"
+        _write_png(multi, 8, 4, px)
+        d = play_test_mod._png_distinct_sample(multi)
+        check("다색 PNG distinct>=2", d is not None and d >= 2)
+
+        # --- PNG 아닌 파일 → 해상도 None, distinct None(폴백 경로) ---
+        notpng = tdp / "notpng.bin"
+        notpng.write_bytes(b"not a png at all")
+        check("비-PNG 해상도 None", play_test_mod._read_png_dimensions(notpng) is None)
+        check("비-PNG distinct None(폴백)", play_test_mod._png_distinct_sample(notpng) is None)
+
+        # --- run_screenshot: 커맨드 미실행 상황(godot 없음)에서도 명확 실패 ---
+        # 존재하지 않는 실행 파일 → FileNotFoundError 를 잡아 Stage.ok=False
+        st = play_test_mod.run_screenshot(
+            str(tdp / "no_such_godot_bin"), proj, tdp / "x.png",
+            frames=1, timeout=5, plat="darwin")
+        check("godot 부재 시 스크린샷 스테이지 FAIL", st.ok is False)
+
+
+def section_screenshot_render() -> None:
+    print("\n[5b] 스크린샷 실제 렌더 e2e (옵트인: ARTIFICER_RUN_SCREENSHOT_RENDER=1)")
+    if os.environ.get("ARTIFICER_RUN_SCREENSHOT_RENDER") != "1":
+        print("  [SKIP] 실제 렌더는 무겁고 GUI/xvfb 가 필요합니다. "
+              "ARTIFICER_RUN_SCREENSHOT_RENDER=1 로 활성화하세요.")
+        return
+    godot = os.environ.get("GODOT_BIN", "godot")
+    if not (shutil.which(godot) or Path(godot).exists()):
+        print("  [SKIP] godot 실행 파일을 찾을 수 없습니다.")
+        return
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "shot.png"  # 임시 경로 — 저장소를 더럽히지 않음
+        st = play_test_mod.run_screenshot(godot, REPO_ROOT, out, frames=10, timeout=120)
+        check("실제 렌더 스테이지 PASS", st.ok)
+        check("PNG 파일 생성됨", out.exists())
+        dims = play_test_mod._read_png_dimensions(out) if out.exists() else None
+        check("PNG 해상도 유효(>0)", dims is not None and dims[0] > 0 and dims[1] > 0)
+        d = play_test_mod._png_distinct_sample(out) if out.exists() else None
+        check("렌더가 비-단색(빈 화면 아님)", d is not None and d >= 2)
+
+
 def main() -> int:
     print("=" * 64)
     print("play 파이프라인 테스트: manifest 검증·쓰기 · play_test 러너")
@@ -209,6 +315,8 @@ def main() -> int:
     section_write_gateway()
     section_integrity_logic()
     section_play_test_e2e()
+    section_screenshot_helpers()
+    section_screenshot_render()
 
     print("\n" + "=" * 64)
     if _failures:
