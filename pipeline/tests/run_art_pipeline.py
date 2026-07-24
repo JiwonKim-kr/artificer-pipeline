@@ -39,6 +39,7 @@ import env_config as env_mod  # noqa: E402
 import scenario_client as sc  # noqa: E402
 import art_reskin as reskin_mod  # noqa: E402
 import placeholder_gen  # noqa: E402
+import verify as verify_mod  # noqa: E402
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -334,12 +335,18 @@ def section_art_reskin() -> None:
         # art gen 산출물 시뮬레이션: 실제 에셋 생성
         shutil.copy(placeholder_asset, real_asset)
 
+        # 복제본의 placeholder 는 원본에서 온 .import 사이드카를 동반한다(정리 대상 실증).
+        placeholder_import = placeholder_asset.parent / (placeholder_asset.name + ".import")
+        check("복제본에 placeholder .import 사이드카 존재(정리 전)", placeholder_import.exists())
+
         # dry-run: 계획만, 변경 없음
         r = _run_reskin(clone, "--id", eid, "--dry-run")
         check("dry-run 종료 0", r.returncode == 0)
         check("dry-run SWAP 계획 표시", "[SWAP]" in r.stdout and "player_idle.png" in r.stdout)
         check("dry-run tscn 미변경", "PLACEHOLDER_player_idle" in scene.read_text(encoding="utf-8"))
         check("dry-run 매니페스트 미변경(placeholder)", _entry(mpath, spath, eid).get("status") == "placeholder")
+        check("dry-run: placeholder 파일 유지 + 삭제 예정만 표시",
+              placeholder_asset.exists() and "삭제 예정" in r.stdout)
 
         # 적용 (--skip-import): 씬 교체 + 매니페스트 갱신
         r = _run_reskin(clone, "--id", eid, "--skip-import")
@@ -352,6 +359,18 @@ def section_art_reskin() -> None:
         check("매니페스트 file=실제 경로", ent.get("file") == "assets/art/sprites/player/player_idle.png")
         check("history 에 generated 추가", "generated" in [h["action"] for h in ent.get("history", [])])
 
+        # 갭 수정 핵심: 교체 성공 후 낡은 placeholder(+.import 사이드카)를 스스로 삭제한다.
+        check("적용 후 낡은 placeholder png 삭제됨", not placeholder_asset.exists())
+        check("적용 후 낡은 placeholder .import 사이드카 삭제됨", not placeholder_import.exists())
+        check("적용 stdout 에 정리 로그", "낡은 placeholder 삭제" in r.stdout)
+
+        # reskin 직후 verify 게이트 #3(undeclared_placeholder)이 통과해야 한다(핵심 회귀).
+        violations = verify_mod.check_naming_rules(clone, mpath, spath)
+        check(f"reskin 직후 게이트 #3 위반 없음 (위반: {[v.render() for v in violations]})",
+              not violations)
+        stage4 = verify_mod.play_test_mod.run_manifest_integrity(mpath, spath, clone)
+        check("reskin 직후 게이트 #4 정합", stage4.ok)
+
         # 갱신 후에도 매니페스트 유효 (단일 창구 통과)
         r = subprocess.run(
             [sys.executable, str(SCRIPTS / "manifest.py"),
@@ -360,9 +379,33 @@ def section_art_reskin() -> None:
         )
         check("갱신 후 매니페스트 유효", r.returncode == 0)
 
+        # (c) 보수적 보류: placeholder 를 requested_by 밖의 다른 씬이 아직 참조하면
+        #     교체 후에도 삭제하지 않고 보류해야 한다(씬 텍스처 깨짐 방지).
+        clone_share = Path(td) / "clone_share"
+        _clone_repo(clone_share)
+        ph_s = clone_share / "assets" / "art" / "sprites" / "player" / "PLACEHOLDER_player_idle.png"
+        real_s = clone_share / "assets" / "art" / "sprites" / "player" / "player_idle.png"
+        shutil.copy(ph_s, real_s)
+        extra_scene = clone_share / "scenes" / "shadow_clone.tscn"
+        extra_scene.write_text(
+            '[gd_scene format=3]\n\n'
+            '[ext_resource type="Texture2D" '
+            'path="res://assets/art/sprites/player/PLACEHOLDER_player_idle.png" id="1_x"]\n\n'
+            '[node name="ShadowClone" type="Node2D"]\n',
+            encoding="utf-8",
+        )
+        r = _run_reskin(clone_share, "--id", eid, "--skip-import")
+        check("(공유) 교체 자체는 종료 0", r.returncode == 0)
+        check("(공유) 다른 씬이 참조 → placeholder 삭제 보류",
+              "삭제 보류" in r.stdout and ph_s.exists())
+        check("(공유) 보류 시 다른 씬의 placeholder 참조 보존",
+              "PLACEHOLDER_player_idle" in extra_scene.read_text(encoding="utf-8"))
+
         # 원본 저장소 불변 확인
         orig_scene = (REPO_ROOT / "scenes" / "player.tscn").read_text(encoding="utf-8")
         check("원본 저장소 scenes/player.tscn 불변", "PLACEHOLDER_player_idle" in orig_scene)
+        check("원본 저장소 placeholder 파일 불변",
+              (REPO_ROOT / "assets/art/sprites/player/PLACEHOLDER_player_idle.png").exists())
 
         # godot 있으면 재임포트 + play_test 까지 (강한 종단 증명)
         if _have_godot():
@@ -374,8 +417,13 @@ def section_art_reskin() -> None:
             )
             r = _run_reskin(clone2, "--id", eid)
             check("(godot) 재임포트 포함 reskin 종료 0", r.returncode == 0 and "재임포트 완료" in r.stdout)
+            # play_test 는 복제본 자신의 매니페스트/스키마로 검사해야 한다(실데이터 매니페스트가
+            # 아니라). reskin 이 낡은 placeholder 를 지운 뒤이므로, 복제본 매니페스트(player 는
+            # generated/실경로, 나머지는 placeholder)와 정합해 게이트 #4 가 통과한다.
             r = subprocess.run(
-                [sys.executable, str(SCRIPTS / "play_test.py"), "--project", str(clone2)],
+                [sys.executable, str(SCRIPTS / "play_test.py"), "--project", str(clone2),
+                 "--manifest", str(clone2 / "pipeline" / "manifest.json"),
+                 "--schema", str(clone2 / "pipeline" / "schemas" / "asset-manifest.schema.json")],
                 capture_output=True, text=True,
             )
             check("(godot) reskin 후 play_test 전체 통과", r.returncode == 0 and "전체 통과" in r.stdout)

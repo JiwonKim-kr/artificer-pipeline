@@ -590,6 +590,8 @@ def section_reskin_compat() -> None:
         check("dry-run: SWAP 계획 표시 · 무변경",
               r.returncode == 0 and "[SWAP]" in r.stdout
               and "PLACEHOLDER_slime_idle" in scene.read_text(encoding="utf-8"))
+        check("dry-run: placeholder 삭제 예정만 표시(실삭제 없음)",
+              "삭제 예정" in r.stdout and placeholder.exists())
 
         r = reskin("--id", entry_id, "--skip-import")
         check("적용 종료 0", r.returncode == 0)
@@ -605,17 +607,12 @@ def section_reskin_compat() -> None:
               and entry["file"] == "assets/art/sprites/enemy/slime_idle.png")
 
         # 교체 후 게이트 상태 (재작업 0 증명).
-        # 알려진 기존 동작: art_reskin 은 낡은 PLACEHOLDER_ 파일을 지우지 않으므로,
-        # 교체 후 그 파일은 "매니페스트 미등록 placeholder" 로 게이트 #3 에 잡힌다.
-        # (placeholder_gen 과 무관한 art_reskin↔verify 기존 갭 — 아래에서 명시적으로 고정.)
+        # art_reskin 은 교체 성공 직후 낡은 PLACEHOLDER_ 파일을 스스로 지우므로,
+        # 별도 수작업 정리 없이 verify 게이트 #3(undeclared_placeholder)이 곧바로 통과한다.
+        # (art_reskin↔verify 갭 수정: 예전에는 여기서 '미등록 placeholder' 위반이 남았다.)
+        check("reskin 이 낡은 placeholder 파일을 스스로 삭제함", not placeholder.exists())
         violations = verify_mod.check_naming_rules(clone, mpath, spath)
-        leftovers = [v for v in violations if "PLACEHOLDER_slime_idle" in v.file]
-        check("교체 후 남는 위반은 '낡은 placeholder 파일' 뿐 (기존 art_reskin 갭)",
-              len(violations) == 1 and len(leftovers) == 1
-              and "매니페스트에 등록되지 않음" in leftovers[0].item)
-        placeholder.unlink()  # reskin 후 정리(=실제 운용에서 낡은 placeholder 제거)
-        violations = verify_mod.check_naming_rules(clone, mpath, spath)
-        check(f"낡은 placeholder 정리 후 게이트 #3 위반 없음 "
+        check(f"reskin 직후 게이트 #3 위반 없음 "
               f"(위반: {[v.render() for v in violations]})", not violations)
         stage = verify_mod.play_test_mod.run_manifest_integrity(mpath, spath, clone)
         check("교체 후 게이트 #4 정합 유지", stage.ok)
