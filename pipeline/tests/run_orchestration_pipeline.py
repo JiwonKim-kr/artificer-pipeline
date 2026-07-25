@@ -105,8 +105,8 @@ def section_verify_repo() -> None:
     check("결과 '전체 통과' 출력", "전체 통과" in r.stdout)
     check("게이트 #3 PASS", "[PASS] 게이트 #3" in r.stdout)
     check("게이트 #4 PASS", "[PASS] 게이트 #4" in r.stdout)
-    # canon 미초기화 → 게이트 5 SKIP + Claude 몫 안내
-    check("게이트 #5 SKIP (canon 미초기화)", "[SKIP] 게이트 #5" in r.stdout)
+    # canon 존재(lore init 완료) → 게이트 5 는 기계 검사를 수행하고 PASS + Claude 몫 안내
+    check("게이트 #5 PASS (canon 존재)", "[PASS] 게이트 #5" in r.stdout)
     check("게이트 #5 의미 검사=Claude 안내", "Claude" in r.stdout)
     if _have_godot():
         check("게이트 #1 PASS (임포트)", "[PASS] 게이트 #1" in r.stdout)
@@ -321,8 +321,8 @@ def section_regression() -> None:
         check(f"{name} 통과", r.returncode == 0)
 
     if _have_godot():
-        r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")])
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
+        r = _run([sys.executable, str(TESTS_DIR / "run_dungeon_turns.py")])
+        check("run_dungeon_turns.py 통과", r.returncode == 0)
     else:
         print("  [SKIP] godot 없음 — acceptance 러너 생략")
 

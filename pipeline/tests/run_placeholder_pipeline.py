@@ -647,8 +647,8 @@ def section_regression() -> None:
         check(f"{name} 통과", r.returncode == 0)
 
     if _have_godot():
-        r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")])
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
+        r = _run([sys.executable, str(TESTS_DIR / "run_dungeon_turns.py")])
+        check("run_dungeon_turns.py 통과", r.returncode == 0)
     else:
         print("  [SKIP] godot 없음 — acceptance 러너 생략")
 

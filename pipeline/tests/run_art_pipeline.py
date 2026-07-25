@@ -319,9 +319,9 @@ def section_art_reskin() -> None:
         mpath = clone / "pipeline" / "manifest.json"
         spath = clone / "pipeline" / "schemas" / "asset-manifest.schema.json"
         scene = clone / "scenes" / "player.tscn"
-        real_asset = clone / "assets" / "art" / "sprites" / "player" / "player_idle.png"
-        placeholder_asset = clone / "assets" / "art" / "sprites" / "player" / "PLACEHOLDER_player_idle.png"
-        eid = "art:player/player_idle"
+        real_asset = clone / "assets" / "art" / "sprites" / "player" / "climber_idle.png"
+        placeholder_asset = clone / "assets" / "art" / "sprites" / "player" / "PLACEHOLDER_climber_idle.png"
+        eid = "art:player/climber_idle"
 
         # 실데이터 보호: 복제본이지 원본이 아님
         check("복제본 경로가 원본과 다름", clone != REPO_ROOT and str(REPO_ROOT) not in str(mpath.relative_to(td)))
@@ -330,7 +330,7 @@ def section_art_reskin() -> None:
         r = _run_reskin(clone, "--id", eid, "--skip-import")
         check("실제 에셋 부재 → 종료 0(변경 없음)", r.returncode == 0)
         check("부재 시 SKIP 보고", "art gen 먼저" in r.stdout or "교체할 대상이 없습니다" in r.stdout)
-        check("부재 시 tscn 미변경", "PLACEHOLDER_player_idle" in scene.read_text(encoding="utf-8"))
+        check("부재 시 tscn 미변경", "PLACEHOLDER_climber_idle" in scene.read_text(encoding="utf-8"))
 
         # art gen 산출물 시뮬레이션: 실제 에셋 생성
         shutil.copy(placeholder_asset, real_asset)
@@ -342,8 +342,8 @@ def section_art_reskin() -> None:
         # dry-run: 계획만, 변경 없음
         r = _run_reskin(clone, "--id", eid, "--dry-run")
         check("dry-run 종료 0", r.returncode == 0)
-        check("dry-run SWAP 계획 표시", "[SWAP]" in r.stdout and "player_idle.png" in r.stdout)
-        check("dry-run tscn 미변경", "PLACEHOLDER_player_idle" in scene.read_text(encoding="utf-8"))
+        check("dry-run SWAP 계획 표시", "[SWAP]" in r.stdout and "climber_idle.png" in r.stdout)
+        check("dry-run tscn 미변경", "PLACEHOLDER_climber_idle" in scene.read_text(encoding="utf-8"))
         check("dry-run 매니페스트 미변경(placeholder)", _entry(mpath, spath, eid).get("status") == "placeholder")
         check("dry-run: placeholder 파일 유지 + 삭제 예정만 표시",
               placeholder_asset.exists() and "삭제 예정" in r.stdout)
@@ -352,11 +352,11 @@ def section_art_reskin() -> None:
         r = _run_reskin(clone, "--id", eid, "--skip-import")
         check("적용 종료 0", r.returncode == 0)
         scene_text = scene.read_text(encoding="utf-8")
-        check("tscn: PLACEHOLDER 제거됨", "PLACEHOLDER_player_idle" not in scene_text)
-        check("tscn: 실제 경로로 교체됨", "res://assets/art/sprites/player/player_idle.png" in scene_text)
+        check("tscn: PLACEHOLDER 제거됨", "PLACEHOLDER_climber_idle" not in scene_text)
+        check("tscn: 실제 경로로 교체됨", "res://assets/art/sprites/player/climber_idle.png" in scene_text)
         ent = _entry(mpath, spath, eid)
         check("매니페스트 status=generated", ent.get("status") == "generated")
-        check("매니페스트 file=실제 경로", ent.get("file") == "assets/art/sprites/player/player_idle.png")
+        check("매니페스트 file=실제 경로", ent.get("file") == "assets/art/sprites/player/climber_idle.png")
         check("history 에 generated 추가", "generated" in [h["action"] for h in ent.get("history", [])])
 
         # 갭 수정 핵심: 교체 성공 후 낡은 placeholder(+.import 사이드카)를 스스로 삭제한다.
@@ -383,14 +383,14 @@ def section_art_reskin() -> None:
         #     교체 후에도 삭제하지 않고 보류해야 한다(씬 텍스처 깨짐 방지).
         clone_share = Path(td) / "clone_share"
         _clone_repo(clone_share)
-        ph_s = clone_share / "assets" / "art" / "sprites" / "player" / "PLACEHOLDER_player_idle.png"
-        real_s = clone_share / "assets" / "art" / "sprites" / "player" / "player_idle.png"
+        ph_s = clone_share / "assets" / "art" / "sprites" / "player" / "PLACEHOLDER_climber_idle.png"
+        real_s = clone_share / "assets" / "art" / "sprites" / "player" / "climber_idle.png"
         shutil.copy(ph_s, real_s)
         extra_scene = clone_share / "scenes" / "shadow_clone.tscn"
         extra_scene.write_text(
             '[gd_scene format=3]\n\n'
             '[ext_resource type="Texture2D" '
-            'path="res://assets/art/sprites/player/PLACEHOLDER_player_idle.png" id="1_x"]\n\n'
+            'path="res://assets/art/sprites/player/PLACEHOLDER_climber_idle.png" id="1_x"]\n\n'
             '[node name="ShadowClone" type="Node2D"]\n',
             encoding="utf-8",
         )
@@ -399,21 +399,21 @@ def section_art_reskin() -> None:
         check("(공유) 다른 씬이 참조 → placeholder 삭제 보류",
               "삭제 보류" in r.stdout and ph_s.exists())
         check("(공유) 보류 시 다른 씬의 placeholder 참조 보존",
-              "PLACEHOLDER_player_idle" in extra_scene.read_text(encoding="utf-8"))
+              "PLACEHOLDER_climber_idle" in extra_scene.read_text(encoding="utf-8"))
 
         # 원본 저장소 불변 확인
         orig_scene = (REPO_ROOT / "scenes" / "player.tscn").read_text(encoding="utf-8")
-        check("원본 저장소 scenes/player.tscn 불변", "PLACEHOLDER_player_idle" in orig_scene)
+        check("원본 저장소 scenes/player.tscn 불변", "PLACEHOLDER_climber_idle" in orig_scene)
         check("원본 저장소 placeholder 파일 불변",
-              (REPO_ROOT / "assets/art/sprites/player/PLACEHOLDER_player_idle.png").exists())
+              (REPO_ROOT / "assets/art/sprites/player/PLACEHOLDER_climber_idle.png").exists())
 
         # godot 있으면 재임포트 + play_test 까지 (강한 종단 증명)
         if _have_godot():
             clone2 = Path(td) / "clone2"
             _clone_repo(clone2)
             shutil.copy(
-                clone2 / "assets/art/sprites/player/PLACEHOLDER_player_idle.png",
-                clone2 / "assets/art/sprites/player/player_idle.png",
+                clone2 / "assets/art/sprites/player/PLACEHOLDER_climber_idle.png",
+                clone2 / "assets/art/sprites/player/climber_idle.png",
             )
             r = _run_reskin(clone2, "--id", eid)
             check("(godot) 재임포트 포함 reskin 종료 0", r.returncode == 0 and "재임포트 완료" in r.stdout)
@@ -450,10 +450,10 @@ def section_regression() -> None:
 
     if _have_godot():
         r = subprocess.run(
-            [sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")],
+            [sys.executable, str(TESTS_DIR / "run_dungeon_turns.py")],
             capture_output=True, text=True,
         )
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
+        check("run_dungeon_turns.py 통과", r.returncode == 0)
     else:
         print("  [SKIP] godot 없음 — acceptance 러너 생략")
 

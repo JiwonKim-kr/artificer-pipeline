@@ -458,9 +458,9 @@ def section_se_attach() -> None:
                       "--schema", str(clone2 / "pipeline" / "schemas" / "asset-manifest.schema.json")])
             check("(godot) attach 후 play_test 전체 통과",
                   r.returncode == 0 and "전체 통과" in r.stdout)
-            r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py"),
+            r = _run([sys.executable, str(TESTS_DIR / "run_dungeon_turns.py"),
                       "--project", str(clone2)])
-            check("(godot) attach 후 acceptance(이동 수용 기준) 통과", r.returncode == 0)
+            check("(godot) attach 후 acceptance(던전/턴 수용 기준) 통과", r.returncode == 0)
         else:
             print("  [SKIP] godot 없음 — 재임포트+play_test+acceptance 종단 검증 생략")
 
@@ -477,8 +477,8 @@ def section_regression() -> None:
     check("run_play_pipeline.py 통과", r.returncode == 0)
 
     if _have_godot():
-        r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")])
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
+        r = _run([sys.executable, str(TESTS_DIR / "run_dungeon_turns.py")])
+        check("run_dungeon_turns.py 통과", r.returncode == 0)
     else:
         print("  [SKIP] godot 없음 — acceptance 러너 생략")
 
