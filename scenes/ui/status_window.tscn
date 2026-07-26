@@ -1,0 +1,52 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/status_window.gd" id="1_status"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.05, 0.06, 0.09, 0.72)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.45, 0.62, 0.72, 0.8)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="StatusWindow" type="CanvasLayer"]
+script = ExtResource("1_status")
+
+[node name="Panel" type="PanelContainer" parent="."]
+offset_left = 8.0
+offset_top = 8.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
+theme_override_constants/separation = 3
+
+[node name="HpLabel" type="Label" parent="Panel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.94, 0.36, 0.36, 1)
+text = "HP  - / -"
+
+[node name="LvLabel" type="Label" parent="Panel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.98, 0.86, 0.35, 1)
+text = "LV  -"
+
+[node name="ExpLabel" type="Label" parent="Panel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.55, 0.82, 0.98, 1)
+text = "EXP  - / -"
+
+[node name="FloorLabel" type="Label" parent="Panel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.6, 0.92, 0.86, 1)
+text = "층  - / -"
+
+[node name="SkillLabel" type="Label" parent="Panel/Margin/VBox"]
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+text = "강타: 미획득"

@@ -11,15 +11,22 @@ extends Actor
 ## `on_hurt`(se:player_hurt 지점, `hurt` 방출) / `on_death`(`died` 방출 — 게임오버는
 ## Spec C 가 연결). 점유(occupancy)는 TurnManager 가 단일 관리한다.
 ##
+## progression_and_clear(Spec C): 돌파(확인 키)·강타(스킬 키) 입력을 **의도 시그널**로만
+## 낸다(게임 로직은 게임 컨트롤러가 처리 — 계단 판정·스킬 활성화). `input_enabled` 로
+## 던전 입력을 게이트해 게임오버 시 승탑자가 더는 움직이지 않게 한다(수용 기준 4).
 ## combat/turn_manager 미주입(Spec A 테스트) 시 범프·점유 로직은 비활성 → 하위 호환.
-## spec: docs/specs/dungeon_and_turns.md, docs/specs/monsters_and_combat.md.
+## spec: docs/specs/dungeon_and_turns.md, docs/specs/monsters_and_combat.md, docs/specs/progression_and_clear.md.
 
 ## 한 칸 이동이 확정된 지점(턴 소비 직후) 방출. `on_step_complete` 가 낸다.
 signal step_completed(cell: Vector2i)
 ## 승탑자 피격 시 방출(효과음: se:player_hurt 연결 지점). `on_hurt` 가 낸다.
 signal hurt
-## 승탑자 HP 0 이하 시 1회 방출(게임오버 처리는 Spec C). `on_death` 가 낸다.
+## 승탑자 HP 0 이하 시 1회 방출(게임오버 처리는 Spec C 의 game.gd 가 연결). `on_death` 가 낸다.
 signal died
+## 확인(돌파) 키 입력 의도. 게임 컨트롤러가 받아 계단 도달 시 다음 층으로 돌파한다.
+signal confirm_pressed
+## 스킬(강타) 키 입력 의도. 게임 컨트롤러가 받아 강타를 활성화한다(턴 미소비).
+signal skill_requested
 
 ## 방향 입력 액션 → 방향 벡터. 액션은 project.godot [input] 에 정의된다.
 const DIRECTIONS: Dictionary = {
@@ -30,6 +37,10 @@ const DIRECTIONS: Dictionary = {
 }
 ## 제자리 대기 입력 액션(1턴 소비, 좌표 불변).
 const WAIT_ACTION: String = "move_wait"
+## 확인(돌파·재시작) 입력 액션. project.godot [input] 에 정의(Spec C).
+const CONFIRM_ACTION: String = "confirm"
+## 강타(스킬) 입력 액션. project.godot [input] 에 정의(Spec C).
+const SKILL_ACTION: String = "skill"
 
 ## 승탑자 노멀 능력치(밸런스 데이터 — 코드 로직에 상수 금지). 범프 공격이 이 범위를 쓴다.
 const NORMAL_PLAYER: Dictionary = {
@@ -38,6 +49,10 @@ const NORMAL_PLAYER: Dictionary = {
 
 @export var tile_size: int = 16
 @export var move_duration: float = 0.12             # 한 칸 시각 보간 시간(초). 0 이면 즉시 스냅.
+
+## 던전 입력 게이트(Spec C). false 면 이동·대기·돌파·강타 입력을 모두 무시한다
+## (게임오버 상태에서 승탑자가 더는 움직이지 않게 함 — 수용 기준 4). 게임 컨트롤러가 토글.
+var input_enabled: bool = true
 
 var grid: Grid = null
 var turn_manager: TurnManager = null
@@ -52,19 +67,26 @@ var _move_elapsed: float = 0.0
 
 ## Grid·시작 셀·(선택)TurnManager·(선택)Combat 을 주입하고 월드 좌표를 정렬한다.
 ## 던전 런타임(Dungeon)이나 테스트가 호출한다. combat 이 주입되면 범프/점유가 활성화된다.
+##
+## `p_reset_stats`(Spec C): true(기본)면 능력치를 노멀 초기값으로 새로 만든다(새 런/최초).
+## false 면 기존 stats(레벨·EXP·HP)를 **이월**한다 — 층 돌파 시 무상 회복 없이 성장·HP 를
+## 그대로 가지고 다음 층으로 간다(수용 기준 7). stats 가 아직 없으면 항상 초기화한다.
 func configure(
 	p_grid: Grid, p_start_cell: Vector2i,
 	p_turn_manager: TurnManager = null, p_combat: Combat = null,
+	p_reset_stats: bool = true,
 ) -> void:
 	grid = p_grid
 	tile_size = p_grid.tile_size
 	cell = p_start_cell
 	faction = Faction.PLAYER
-	stats = Stats.from_data(NORMAL_PLAYER)
+	if p_reset_stats or stats == null:
+		stats = Stats.from_data(NORMAL_PLAYER)
 	if p_turn_manager != null:
 		turn_manager = p_turn_manager
 	if p_combat != null:
 		_combat = p_combat
+	input_enabled = true
 	_visual_moving = false
 	_move_elapsed = 0.0
 	position = grid.cell_to_world(cell)
@@ -148,11 +170,21 @@ func _process(delta: float) -> void:
 
 
 func _poll_input() -> void:
+	# 게임오버 등에서 입력이 잠기면(수용 기준 4) 이동·행동·돌파·강타 모두 무시.
+	if not input_enabled:
+		return
 	# 턴제: 눌린 순간(just_pressed)마다 1행동. 보간 진행 중에도 입력을 막지 않는다.
 	for action in DIRECTIONS:
 		if InputMap.has_action(action) and Input.is_action_just_pressed(action):
 			attempt_move(DIRECTIONS[action])
 			return
+	# 돌파(확인)·강타(스킬)는 의도 시그널만 낸다 — 처리는 게임 컨트롤러가(계단 판정·활성화).
+	if InputMap.has_action(CONFIRM_ACTION) and Input.is_action_just_pressed(CONFIRM_ACTION):
+		confirm_pressed.emit()
+		return
+	if InputMap.has_action(SKILL_ACTION) and Input.is_action_just_pressed(SKILL_ACTION):
+		skill_requested.emit()
+		return
 	if InputMap.has_action(WAIT_ACTION) and Input.is_action_just_pressed(WAIT_ACTION):
 		wait()
 

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://src/core/dungeon.gd" id="1_dungeon"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
@@ -10,6 +10,17 @@
 [ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/player_attack.ogg" id="8_se_stream"]
 [ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="9_se_emitter"]
 [ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/enemy_hit.ogg" id="10_se_stream"]
+[ext_resource type="Script" path="res://src/core/game.gd" id="11_game"]
+[ext_resource type="PackedScene" path="res://scenes/ui/status_window.tscn" id="12_status"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_over.tscn" id="13_gameover"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="14_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/level_up.ogg" id="15_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="16_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/floor_clear.ogg" id="17_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="18_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/game_over.ogg" id="19_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="20_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/skill_use.ogg" id="21_se_stream"]
 
 [node name="Dungeon" type="Node2D"]
 script = ExtResource("1_dungeon")
@@ -42,3 +53,34 @@ script = ExtResource("9_se_emitter")
 stream = ExtResource("10_se_stream")
 target_path = NodePath("..")
 signal_name = &"enemy_hit"
+
+[node name="Game" type="Node" parent="."]
+script = ExtResource("11_game")
+
+[node name="StatusWindow" parent="." instance=ExtResource("12_status")]
+
+[node name="GameOver" parent="." instance=ExtResource("13_gameover")]
+
+[node name="SeLevelUp" type="AudioStreamPlayer" parent="Game"]
+script = ExtResource("14_se_emitter")
+stream = ExtResource("15_se_stream")
+target_path = NodePath("..")
+signal_name = &"leveled_up"
+
+[node name="SeFloorClear" type="AudioStreamPlayer" parent="Game"]
+script = ExtResource("16_se_emitter")
+stream = ExtResource("17_se_stream")
+target_path = NodePath("..")
+signal_name = &"floor_cleared"
+
+[node name="SeGameOver" type="AudioStreamPlayer" parent="Game"]
+script = ExtResource("18_se_emitter")
+stream = ExtResource("19_se_stream")
+target_path = NodePath("..")
+signal_name = &"run_ended"
+
+[node name="SeSkillUse" type="AudioStreamPlayer" parent="Game"]
+script = ExtResource("20_se_emitter")
+stream = ExtResource("21_se_stream")
+target_path = NodePath("..")
+signal_name = &"skill_triggered"

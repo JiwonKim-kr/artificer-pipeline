@@ -12,7 +12,12 @@ extends Node
 ## 피격자 쪽 이벤트(승탑자 피해/몬스터 처치)는 피격자 Actor 의 `on_hurt`/`on_death`
 ## 훅(각 스크립트가 자기 시그널 방출)으로 위임한다.
 ##
-## spec: docs/specs/monsters_and_combat.md (combat.gd 역할, se 표 on_player_attack/on_enemy_hit).
+## progression_and_clear(Spec C) 확장: **강타 강화**(승탑자 준비 상태면 범프 데미지를
+## 시드 롤 위에 강화)와 **처치 EXP 부여**(승탑자가 몬스터를 처치하면 그 개체의 exp_reward
+## 를 처치자에게)를 연결한다. 둘 다 주입 훅(`skill`/`progression`)이며 미주입 시 무영향 —
+## Spec A/B 동작을 그대로 보존한다(하위 호환).
+##
+## spec: docs/specs/monsters_and_combat.md, docs/specs/progression_and_clear.md (combat.gd 역할).
 
 ## 승탑자 범프 공격 순간(효과음: se:player_attack 연결 지점).
 signal player_attacked
@@ -22,6 +27,12 @@ signal enemy_hit
 ## 데미지 롤에 쓰는 시드 스트림. 던전 런타임이 던전 시드에서 파생해 주입한다.
 ## (단위 테스트는 고정 시드 Rng 를 직접 주입해 재현성을 검증.)
 var rng: Rng = null
+## 강타 강화 훅(Spec C, 승탑자 전용). 승탑자의 Skill 을 주입하면 준비된 강타가 이 범프의
+## 데미지를 배수/보너스로 강화한다(시드 롤 위에). null 이면 강화 없음 — 하위 호환.
+var skill: Skill = null
+## 처치 EXP 엔진(Spec C). 주입하면 승탑자가 몬스터를 처치할 때 exp_reward 를 부여한다
+## (다중 레벨업 연쇄는 progression 이 처리). null 이면 EXP 부여 없음 — 하위 호환.
+var progression: Progression = null
 
 
 ## 범프 공격 1회를 해석한다. attacker 가 defender 를 친다.
@@ -36,6 +47,11 @@ func resolve_bump(attacker: Actor, defender: Actor) -> int:
 		return 0
 	var damage: int = _roll_damage(attacker.stats)
 
+	# 강타(Spec C): 승탑자의 준비된 강타면 이 범프에서 시드 롤 위에 데미지를 강화한다
+	# (강화 공격이 성립하는 시점 → 쿨다운 시작). 준비 아님/미주입이면 그대로 반환(무영향).
+	if attacker.faction == Actor.Faction.PLAYER and skill != null:
+		damage = skill.consume_for_attack(damage)
+
 	if attacker.faction == Actor.Faction.PLAYER:
 		on_player_attack()
 
@@ -46,6 +62,11 @@ func resolve_bump(attacker: Actor, defender: Actor) -> int:
 		on_enemy_hit()
 
 	if defender.is_dead():
+		# 처치 EXP(Spec C): 승탑자가 몬스터를 처치하면 그 개체의 exp_reward 를 부여한다
+		# (다중 레벨업 연쇄는 progression 이 처리). on_death(제거) 전에 stats 를 읽어 부여.
+		if progression != null and attacker.faction == Actor.Faction.PLAYER \
+				and defender.faction == Actor.Faction.ENEMY:
+			progression.add_exp(attacker.stats, defender.stats.exp_reward)
 		defender.on_death()
 
 	return damage

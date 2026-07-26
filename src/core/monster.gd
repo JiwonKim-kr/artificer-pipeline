@@ -17,14 +17,15 @@ signal died(monster: Monster)
 
 ## 노멀 난이도 몬스터 데이터(밸런스의 단일 출처 — 코드 로직에 상수 금지).
 ## lore/canon/glossary.md: 미궁 쥐(약함·무리) / 슬라임(느림·맷집).
+## `exp_reward`(Spec C): 처치 시 처치자(승탑자)에게 주는 경험치 — 맷집 큰 슬라임이 더 높다.
 const NORMAL_MONSTERS: Dictionary = {
 	"dungeon_rat": {
 		"hp": 3, "attack_min": 1, "attack_max": 2,
-		"aggro_range": 6, "move_period": 1,
+		"aggro_range": 6, "move_period": 1, "exp_reward": 2,
 	},
 	"slime": {
 		"hp": 8, "attack_min": 1, "attack_max": 1,
-		"aggro_range": 4, "move_period": 2,
+		"aggro_range": 4, "move_period": 2, "exp_reward": 5,
 	},
 }
 

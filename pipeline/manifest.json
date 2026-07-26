@@ -294,6 +294,110 @@
       "lore_refs": [
         "lore/canon/world.md"
       ]
+    },
+    {
+      "id": "se:level_up",
+      "track": "se",
+      "status": "generated",
+      "spec": "승탑자 레벨업 순간의 상승하는 긍정적 효과음. 레트로 톤(jsfxr). 성장·보상감.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/game.gd::on_level_up"
+        }
+      ],
+      "file": "assets/audio/se/level_up.ogg",
+      "history": [
+        {
+          "at": "2026-07-26T11:39:21.096801+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-26T17:27:12.679485+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/world.md"
+      ]
+    },
+    {
+      "id": "se:floor_clear",
+      "track": "se",
+      "status": "generated",
+      "spec": "층 돌파(등반) 순간의 상승하는 짧은 팡파레. 레트로 톤(jsfxr). 성취감.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/game.gd::on_floor_clear"
+        }
+      ],
+      "file": "assets/audio/se/floor_clear.ogg",
+      "history": [
+        {
+          "at": "2026-07-26T11:39:21.131076+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-26T17:27:12.714164+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/world.md"
+      ]
+    },
+    {
+      "id": "se:game_over",
+      "track": "se",
+      "status": "generated",
+      "spec": "승탑자 사망·게임오버의 하강하는 부정적 효과음. 레트로 톤(jsfxr). 영구사망의 무게.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/game.gd::on_game_over"
+        }
+      ],
+      "file": "assets/audio/se/game_over.ogg",
+      "history": [
+        {
+          "at": "2026-07-26T11:39:21.164934+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-26T17:27:12.748527+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/world.md"
+      ]
+    },
+    {
+      "id": "se:skill_use",
+      "track": "se",
+      "status": "generated",
+      "spec": "강타 발동(강화 공격) 순간의 강하고 묵직한 타격 효과음. 레트로 톤(jsfxr). player_attack 보다 강하게.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/game.gd::on_skill_use"
+        }
+      ],
+      "file": "assets/audio/se/skill_use.ogg",
+      "history": [
+        {
+          "at": "2026-07-26T11:39:21.199163+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-26T17:27:12.782359+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/world.md"
+      ]
     }
   ]
 }
