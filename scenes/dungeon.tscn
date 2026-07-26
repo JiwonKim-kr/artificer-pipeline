@@ -1,10 +1,15 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://src/core/dungeon.gd" id="1_dungeon"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
 [ext_resource type="Texture2D" path="res://assets/art/sprites/tiles/PLACEHOLDER_dungeon_floor.png" id="3_floor"]
 [ext_resource type="Texture2D" path="res://assets/art/sprites/tiles/PLACEHOLDER_dungeon_wall.png" id="4_wall"]
 [ext_resource type="Texture2D" path="res://assets/art/sprites/tiles/PLACEHOLDER_stairs_up.png" id="5_stairs"]
+[ext_resource type="Script" path="res://src/core/combat.gd" id="6_combat"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="7_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/player_attack.ogg" id="8_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="9_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/enemy_hit.ogg" id="10_se_stream"]
 
 [node name="Dungeon" type="Node2D"]
 script = ExtResource("1_dungeon")
@@ -16,7 +21,24 @@ tile_size = 16
 
 [node name="Tiles" type="Node2D" parent="."]
 
+[node name="Monsters" type="Node2D" parent="."]
+
+[node name="Combat" type="Node" parent="."]
+script = ExtResource("6_combat")
+
 [node name="Player" parent="." instance=ExtResource("2_player")]
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
 zoom = Vector2(2, 2)
+
+[node name="SePlayerAttack" type="AudioStreamPlayer" parent="Combat"]
+script = ExtResource("7_se_emitter")
+stream = ExtResource("8_se_stream")
+target_path = NodePath("..")
+signal_name = &"player_attacked"
+
+[node name="SeEnemyHit" type="AudioStreamPlayer" parent="Combat"]
+script = ExtResource("9_se_emitter")
+stream = ExtResource("10_se_stream")
+target_path = NodePath("..")
+signal_name = &"enemy_hit"

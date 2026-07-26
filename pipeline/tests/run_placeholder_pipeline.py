@@ -529,9 +529,11 @@ def section_godot_import() -> None:
         check("임포트 로그에 텍스처 오류 없음",
               "Error" not in err and "ERROR: Cannot" not in err)
 
-        # 원본 저장소 불변
-        check("원본 assets/ 에 신규 파일 없음",
-              not (REPO_ROOT / "assets/art/sprites/enemy").exists())
+        # 원본 저장소 불변 — 복제본 전용 산출물이 원본에 새지 않았는지(격리)를
+        # 이 테스트가 만든 특정 파일로 검사한다. (게임이 정식으로 enemy/ 스프라이트를
+        # 가질 수 있으므로 디렉토리 존재 여부로 판정하지 않는다.)
+        check("원본 assets/ 에 이 테스트의 복제본 산출물이 새지 않음",
+              not (REPO_ROOT / "assets/art/sprites/enemy/PLACEHOLDER_slime_idle.png").exists())
 
 
 # ---------------------------------------------------------------------------

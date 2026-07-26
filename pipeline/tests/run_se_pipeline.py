@@ -413,6 +413,9 @@ def section_se_attach() -> None:
               _entry(mpath, spath, eid).get("status") == "placeholder")
 
         # 적용 (--skip-import): 브리지 삽입 + 매니페스트 갱신
+        # 브리지 삽입은 ext_resource 2건을 더하므로 load_steps 가 +2 된다.
+        # (절대값은 player.tscn 의 기존 상태에 따라 달라지므로 적용 전 값 기준으로 검사.)
+        base_load_steps = int(scene.read_text(encoding="utf-8").split("load_steps=")[1].split()[0])
         r = _run_attach(clone, "--skip-import")
         check("적용 종료 0", r.returncode == 0)
         scene_text = scene.read_text(encoding="utf-8")
@@ -420,7 +423,8 @@ def section_se_attach() -> None:
         check("tscn: 브리지 스크립트 참조", "res://src/tools/se_emitter.gd" in scene_text)
         check("tscn: 실제 스트림 경로 연결", "res://assets/audio/se/player_step.ogg" in scene_text)
         check("tscn: 시그널 데이터 주입", 'signal_name = &"step_completed"' in scene_text)
-        check("tscn: load_steps 갱신(3→5)", "load_steps=5" in scene_text)
+        check("tscn: load_steps 브리지 삽입으로 +2 증가",
+              int(scene_text.split("load_steps=")[1].split()[0]) == base_load_steps + 2)
         ent = _entry(mpath, spath, eid)
         check("매니페스트 status=generated", ent.get("status") == "generated")
         check("매니페스트 file=실제 경로", ent.get("file") == "assets/audio/se/player_step.ogg")

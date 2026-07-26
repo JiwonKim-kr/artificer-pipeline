@@ -146,6 +146,154 @@
       "lore_refs": [
         "lore/canon/world.md"
       ]
+    },
+    {
+      "id": "art:enemy/dungeon_rat",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "지하 미궁 몬스터 '미궁 쥐' 플레이스홀더 스프라이트. 글리프 'r' 갈색, 투명 배경, 타일 크기 정사각. 약하고 무리 짓는 입문급 적.",
+      "requested_by": [
+        {
+          "kind": "scene_node",
+          "path": "scenes/monster.tscn::Monster/Sprite2D"
+        }
+      ],
+      "file": "assets/art/sprites/enemy/PLACEHOLDER_dungeon_rat.png",
+      "history": [
+        {
+          "at": "2026-07-25T11:05:55.667904+00:00",
+          "action": "registered"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/glossary.md"
+      ]
+    },
+    {
+      "id": "art:enemy/slime",
+      "track": "art",
+      "status": "placeholder",
+      "spec": "지하 미궁 몬스터 '슬라임' 플레이스홀더 스프라이트. 글리프 's' 녹색, 투명 배경, 타일 크기 정사각. 느리지만 맷집 있는 점액질 적.",
+      "requested_by": [
+        {
+          "kind": "scene_node",
+          "path": "scenes/monster.tscn::Monster/Sprite2D"
+        }
+      ],
+      "file": "assets/art/sprites/enemy/PLACEHOLDER_slime.png",
+      "history": [
+        {
+          "at": "2026-07-25T11:05:55.702529+00:00",
+          "action": "registered"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/glossary.md"
+      ]
+    },
+    {
+      "id": "se:player_attack",
+      "track": "se",
+      "status": "generated",
+      "spec": "승탑자 범프 공격 순간의 타격/휘두름 효과음. 레트로 톤(jsfxr). 짧고 날카롭게.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/combat.gd::on_player_attack"
+        }
+      ],
+      "file": "assets/audio/se/player_attack.ogg",
+      "history": [
+        {
+          "at": "2026-07-25T11:14:55.570373+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-25T11:19:32.488423+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/world.md"
+      ]
+    },
+    {
+      "id": "se:enemy_hit",
+      "track": "se",
+      "status": "generated",
+      "spec": "몬스터가 피격당하는 순간의 둔탁한 타격 효과음. 레트로 톤(jsfxr).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/combat.gd::on_enemy_hit"
+        }
+      ],
+      "file": "assets/audio/se/enemy_hit.ogg",
+      "history": [
+        {
+          "at": "2026-07-25T11:14:55.605686+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-25T11:19:32.522589+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/world.md"
+      ]
+    },
+    {
+      "id": "se:enemy_death",
+      "track": "se",
+      "status": "generated",
+      "spec": "몬스터 처치(소멸) 순간의 파괴/파열 효과음. 레트로 톤(jsfxr).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/monster.gd::on_death"
+        }
+      ],
+      "file": "assets/audio/se/enemy_death.ogg",
+      "history": [
+        {
+          "at": "2026-07-25T11:14:55.640712+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-25T11:19:32.556572+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/glossary.md"
+      ]
+    },
+    {
+      "id": "se:player_hurt",
+      "track": "se",
+      "status": "generated",
+      "spec": "승탑자가 피해를 입는 순간의 경고성 둔탁한 효과음. 레트로 톤(jsfxr). enemy_hit 과 구분되게 저음.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/core/player.gd::on_hurt"
+        }
+      ],
+      "file": "assets/audio/se/player_hurt.ogg",
+      "history": [
+        {
+          "at": "2026-07-25T11:14:55.675273+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-07-25T11:19:32.590856+00:00",
+          "action": "generated"
+        }
+      ],
+      "lore_refs": [
+        "lore/canon/world.md"
+      ]
     }
   ]
 }
