@@ -17,7 +17,7 @@
 | 렌더러 | **`gl_compatibility` 고정** | Godot 4.6 웹 플랫폼은 Compatibility(WebGL 2)만 안정 지원. 기본값 `forward_plus` 로는 빌드가 성립하지 않는다. 콘솔 확인: `OpenGL ES 3.0 (WebGL 2.0) - Compatibility` |
 | 스레드 | **`variant/thread_support=false`** | 스레드 빌드는 `SharedArrayBuffer` → COOP/COEP 교차출처 격리 헤더가 필수인데, **GitHub Pages 는 커스텀 헤더를 설정할 수 없다.** 미사용 빌드는 헤더 없는 정적 서버에서 구동됨을 확인 (`crossOriginIsolated=false`, `SharedArrayBuffer` 미정의 상태에서 정상 실행) |
 | GDExtension | 미지원 | 빌드 구성: `Emscripten 4.0.20, single-threaded, no GDExtension support`. 네이티브 확장에 의존하는 설계를 하지 않는다 |
-| 제외 대상 | `exclude_filter` 필수 | `export_filter="all_resources"` 는 프로젝트 전체를 pck 에 담는다. 실측에서 `pipeline/scripts/se_node/node_modules/**` 까지 패킹되는 것을 확인 → 파이프라인 스크립트·테스트·문서·정본을 제외 |
+| 제외 대상 | `exclude_filter` 필수 | `export_filter="all_resources"` 는 프로젝트 전체를 pck 에 담는다. 실측에서 `pipeline/scripts/se_node/node_modules/**`, 그리고 개발용 여론 시뮬(`sim/opinion-model/config.json`)까지 패킹되는 것을 확인 → 파이프라인 스크립트·테스트·문서·정본·개발 시뮬(`sim/`)을 제외. **원칙**: 오프라인/개발 단계 산출물은 런타임 빌드에 절대 넣지 않는다(2계층 아키텍처). 새 개발용 최상위 디렉토리가 생기면 이 필터에 추가할 것 |
 
 ## 측정값
 
