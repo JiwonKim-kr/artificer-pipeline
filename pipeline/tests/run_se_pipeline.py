@@ -17,7 +17,8 @@ Phase 1~3 의 run_lore_roundtrip / run_play_pipeline / run_art_pipeline 과 같�
                          왕복. 에셋 부재 skip / dry-run 무변경 / 적용 후 tscn·
                          매니페스트 확인 / 멱등 재실행. (godot 있으면 재임포트 +
                          play_test + acceptance 종단 검증.)
-  [5] 회귀             : 기존 러너 4종(lore/play/acceptance/art) 통과 유지.
+  [5] 회귀             : 기존 러너 3종(lore/play/art) 통과 유지.
+                         (수용 테스트는 se_attach 의 godot 종단 경로에서 실행.)
 
 CLAUDE.md 규칙: 실데이터(assets/, scenes/, pipeline/manifest.json, src/)는 절대
 수정하지 않는다. 모든 쓰기 검사는 임시 사본/임시 디렉토리 대상.
@@ -39,9 +40,11 @@ REPO_ROOT = TESTS_DIR.parent.parent
 SCRIPTS = TESTS_DIR.parent / "scripts"
 
 sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(TESTS_DIR / "fixtures" / "sample_game"))
 import elevenlabs_client as el  # noqa: E402
 import se_attach as attach_mod  # noqa: E402
 import se_jsfxr as jsfxr_mod  # noqa: E402
+import sample_game  # noqa: E402  (검증 대상 게임에 무관한 테스트 픽스처)
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -322,10 +325,12 @@ def section_elevenlabs() -> None:
 # [4] se_attach (임시 복제본 왕복)
 # ---------------------------------------------------------------------------
 def _clone_repo(dst: Path) -> None:
+    # fixtures 제외: sample_game 은 install() 이 정규 경로로 설치한다(픽스처 원본이
+    # 복제본에 남으면 gdignore 밖이 아니어도 불필요한 중복이 된다).
     shutil.copytree(
         REPO_ROOT, dst,
         ignore=shutil.ignore_patterns(
-            ".git", ".godot", "__pycache__", "*.pyc", "export", "node_modules"),
+            ".git", ".godot", "__pycache__", "*.pyc", "export", "node_modules", "fixtures"),
     )
 
 
@@ -366,8 +371,8 @@ def _make_real_asset(clone: Path) -> str:
 def section_se_attach() -> None:
     print("\n[4] se_attach — code_event → 브리지 삽입 왕복 (저장소 전체 임시 복제)")
 
-    # 단위: 시그널 유도 (실제 player.gd 소스 기준)
-    player_src = (REPO_ROOT / "src" / "core" / "player.gd").read_text(encoding="utf-8")
+    # 단위: 시그널 유도 (sample_game 픽스처의 player.gd 소스 기준)
+    player_src = (sample_game.FIXTURE_DIR / "src" / "core" / "player.gd").read_text(encoding="utf-8")
     sig, why = attach_mod.derive_signal(player_src, "on_step_complete")
     check("derive_signal: on_step_complete → step_completed", sig == "step_completed" and why is None)
     sig, why = attach_mod.derive_signal(player_src, "step_completed")
@@ -379,12 +384,17 @@ def section_se_attach() -> None:
     check("node_name_for_entry: se:ui/confirm → SeUiConfirm",
           attach_mod.node_name_for_entry("se:ui/confirm") == "SeUiConfirm")
 
-    orig_scene_text = (REPO_ROOT / "scenes" / "player.tscn").read_text(encoding="utf-8")
+    orig_fixture_scene = (sample_game.FIXTURE_DIR / "scenes" / "player.tscn").read_text(encoding="utf-8")
     orig_manifest_text = (REPO_ROOT / "pipeline" / "manifest.json").read_text(encoding="utf-8")
 
     with tempfile.TemporaryDirectory() as td:
         clone = Path(td) / "clone"
         _clone_repo(clone)
+        # 검증 대상 게임에 무관한 sample_game 픽스처를 복제본에 설치(저장소엔 게임 없음)
+        sample_game.install(clone)
+        ra = sample_game.register_art(clone)
+        rs = sample_game.register_se(clone)
+        check("픽스처 매니페스트 등록 성공", ra.returncode == 0 and rs.returncode == 0)
         mpath = clone / "pipeline" / "manifest.json"
         spath = clone / "pipeline" / "schemas" / "asset-manifest.schema.json"
         scene = clone / "scenes" / "player.tscn"
@@ -438,9 +448,11 @@ def section_se_attach() -> None:
         check("브리지 노드 중복 없음",
               scene.read_text(encoding="utf-8").count('name="SePlayerStep"') == 1)
 
-        # 원본 저장소 불변 확인 (실데이터 보호)
-        check("원본 scenes/player.tscn 불변",
-              (REPO_ROOT / "scenes" / "player.tscn").read_text(encoding="utf-8") == orig_scene_text)
+        # 실데이터 보호: 저장소엔 게임 콘텐츠가 없고(픽스처에만), 픽스처·매니페스트 불변
+        check("저장소 scenes/ 에 게임 씬 없음(픽스처에만 존재)",
+              not (REPO_ROOT / "scenes" / "player.tscn").exists())
+        check("픽스처 player.tscn 불변",
+              (sample_game.FIXTURE_DIR / "scenes" / "player.tscn").read_text(encoding="utf-8") == orig_fixture_scene)
         check("원본 manifest.json 불변",
               (REPO_ROOT / "pipeline" / "manifest.json").read_text(encoding="utf-8") == orig_manifest_text)
 
@@ -448,6 +460,9 @@ def section_se_attach() -> None:
         if _have_godot():
             clone2 = Path(td) / "clone2"
             _clone_repo(clone2)
+            sample_game.install(clone2)
+            sample_game.register_art(clone2)
+            sample_game.register_se(clone2)
             _make_real_asset(clone2)
             r = _run_attach(clone2)
             check("(godot) 재임포트 포함 attach 종료 0",
@@ -458,7 +473,8 @@ def section_se_attach() -> None:
                       "--schema", str(clone2 / "pipeline" / "schemas" / "asset-manifest.schema.json")])
             check("(godot) attach 후 play_test 전체 통과",
                   r.returncode == 0 and "전체 통과" in r.stdout)
-            r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py"),
+            r = _run([sys.executable,
+                      str(TESTS_DIR / "fixtures" / "sample_game" / "run_acceptance_player_movement.py"),
                       "--project", str(clone2)])
             check("(godot) attach 후 acceptance(이동 수용 기준) 통과", r.returncode == 0)
         else:
@@ -476,11 +492,9 @@ def section_regression() -> None:
     r = _run([sys.executable, str(TESTS_DIR / "run_play_pipeline.py")])
     check("run_play_pipeline.py 통과", r.returncode == 0)
 
-    if _have_godot():
-        r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")])
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
-    else:
-        print("  [SKIP] godot 없음 — acceptance 러너 생략")
+    # 수용 테스트(sample_game 이동 기준)는 section_se_attach 의 godot 경로에서
+    # attach 후 종단으로 이미 실행한다. 러너는 픽스처로 이전되어 저장소 게임에
+    # 의존하지 않으므로 여기서 별도 호출하지 않는다.
 
     r = _run([sys.executable, str(TESTS_DIR / "run_art_pipeline.py")])
     check("run_art_pipeline.py 통과", r.returncode == 0)

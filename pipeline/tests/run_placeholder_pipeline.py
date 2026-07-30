@@ -18,7 +18,7 @@ run_se_pipeline / run_orchestration_pipeline 과 같은 스타일
                           `godot --headless --import` 성공 확인.
   [6] reskin 호환       : 복제본에서 생성 → manifest.py 등록 → verify 게이트 #3 →
                           art_reskin.py 로 실제 에셋 교체까지 왕복.
-  [7] 회귀              : 기존 러너 6종 + verify 게이트 통과 유지
+  [7] 회귀              : 기존 러너 5종 + verify 게이트 통과 유지
                           (verify --full 안에서 호출되면 중복 실행 생략).
 
 CLAUDE.md 규칙: 실데이터(assets/, scenes/, pipeline/manifest.json, src/,
@@ -632,10 +632,10 @@ def section_reskin_compat() -> None:
 
 
 # ---------------------------------------------------------------------------
-# [7] 회귀 (기존 러너 6종 + verify 게이트)
+# [7] 회귀 (기존 러너 5종 + verify 게이트)
 # ---------------------------------------------------------------------------
 def section_regression() -> None:
-    print("\n[7] 회귀 — 기존 러너 6종 + verify 게이트 통과 유지")
+    print("\n[7] 회귀 — 기존 러너 5종 + verify 게이트 통과 유지")
     if UNDER_FULL:
         print("  [SKIP] verify --full 안에서 호출됨 — 러너는 verify --full 이 직접 실행하므로 중복 생략")
         return
@@ -646,11 +646,9 @@ def section_regression() -> None:
         r = _run([sys.executable, str(TESTS_DIR / name)])
         check(f"{name} 통과", r.returncode == 0)
 
-    if _have_godot():
-        r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")])
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
-    else:
-        print("  [SKIP] godot 없음 — acceptance 러너 생략")
+    # 기능 수용 테스트(run_acceptance_*.py)는 검증 대상 게임에 종속이므로 여기서
+    # 고정 호출하지 않는다. verify --full 이 pipeline/tests/run_*.py 를 자동 발견해
+    # 실행하므로, 새 게임의 play build 가 수용 테스트를 만들면 자동으로 포함된다.
 
     # verify 게이트 (저장소 원본 대상, 읽기 전용)
     gates, exec_errors = verify_mod.run_gates(

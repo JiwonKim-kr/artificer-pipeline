@@ -1,14 +1,9 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
-
+; 중립 진입 씬. 검증 대상 게임(로그라이크 데모)은 pipeline/tests/fixtures/sample_game/
+; 으로 이전되어 파이프라인 자체 테스트의 픽스처로만 쓰인다. main 브랜치는 게임
+; 콘텐츠가 없는 파이프라인 정본이므로 이 씬은 비어 있다.
+; 이 파일이 존재해야 하는 이유: verify 게이트 #2(스모크)가 project.godot 의
+; main_scene 을 인스턴스화해 로드 성공을 확인하기 때문. 승인된 spec 을 받으면
+; play build 가 실제 내용을 채운다.
 [node name="Main" type="Node2D"]
-
-[node name="TileMapLayer" type="TileMapLayer" parent="."]
-
-[node name="Player" parent="." instance=ExtResource("1_player")]
-tile_size = 16
-map_size = Vector2i(9, 9)
-blocked_cells = Array[Vector2i]([Vector2i(4, 4), Vector2i(4, 5), Vector2i(5, 4)])
-start_cell = Vector2i(1, 1)
-move_duration = 0.12

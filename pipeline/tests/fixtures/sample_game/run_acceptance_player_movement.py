@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """player_movement 수용 기준 자동 테스트 러너.
 
-승인 spec(docs/specs/player_movement.md)의 수용 기준 1~4 를, Godot 헤드리스
+[sample_game 픽스처 러너] 예전 검증 데모의 수용 기준 1~4 를, Godot 헤드리스
 SceneTree 스크립트(acceptance_player_movement.gd)로 실제 Player 를 인스턴스화해
 검증한다. play test(스모크)가 다루는 것은 기준 5(메인 씬 로드)뿐이므로, 이동/
 차단/경계/정렬 행위는 이 러너가 책임진다.
@@ -23,8 +23,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-TESTS_DIR = Path(__file__).resolve().parent
-REPO_ROOT = TESTS_DIR.parent.parent
+# 이 러너는 pipeline/tests/fixtures/sample_game/ 로 이전되었다(검증 대상 게임에
+# 무관한 픽스처). 항상 --project <복제본> 으로 호출되며, 복제본에는 sample_game.install()
+# 이 수용 스크립트를 res://pipeline/tests/acceptance_player_movement.gd 로 깔아 둔다.
+FIXTURE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = FIXTURE_DIR.parents[3]  # fixtures/sample_game -> fixtures -> tests -> pipeline -> repo
 ACCEPT_SCRIPT = "res://pipeline/tests/acceptance_player_movement.gd"
 
 # 각 수용 기준을 검증하는 체크 라벨 접두사 (리포트 매핑용)

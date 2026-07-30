@@ -16,7 +16,7 @@ run_se_pipeline 와 같은 스타일(단일 파일·번호 섹션·check 헬퍼�
                                    원본 저장소 불변 확인.
   [5] verify --full 재귀 가드      : 중첩 --full 이 러너 재실행을 생략하는지 +
                                    discover_runners 목록 확인 (무한루프 방지).
-  [6] 회귀                        : 기존 러너 5종 통과 유지
+  [6] 회귀                        : 기존 러너 4종 통과 유지
                                    (verify --full 안에서 호출되면 중복 실행 생략).
 
 CLAUDE.md 규칙: 실데이터(assets/, scenes/, pipeline/manifest.json, src/core/,
@@ -128,10 +128,12 @@ def section_gate3_violations() -> None:
         r = _verify(clone, "--skip-godot")
         check("정상 복제본 게이트 #3 PASS", "[PASS] 게이트 #3" in r.stdout)
 
-        # 의도적 위반 5종 심기
+        # 의도적 위반 5종 심기.
+        # 카테고리 디렉토리는 게임마다 다르므로 존재를 가정하지 않고 직접 만든다.
         (clone / "src" / "tools" / "BadName.gd").write_text("extends Node\n", encoding="utf-8")
-        (clone / "assets" / "art" / "sprites" / "player"
-         / "PLACEHOLDER_unregistered.png").write_bytes(b"\x89PNG")
+        fixture_dir = clone / "assets" / "art" / "sprites" / "fixture"
+        fixture_dir.mkdir(parents=True, exist_ok=True)
+        (fixture_dir / "PLACEHOLDER_unregistered.png").write_bytes(b"\x89PNG")
         (clone / "assets" / "audio" / "se" / "bad_sound.mp3").write_bytes(b"x")
         (clone / "assets" / "art" / "sprites" / "loose_sprite.png").write_bytes(b"\x89PNG")
         (clone / "scenes" / "wrong.tscn").write_text(
@@ -158,7 +160,17 @@ def section_gate3_violations() -> None:
         _clone_repo(clone2)
         m2 = clone2 / "pipeline" / "manifest.json"
         data = json.loads(m2.read_text(encoding="utf-8"))
-        data["entries"][0]["id"] = "art:BadCaps"  # 대문자 → 패턴 위반
+        # 저장소 매니페스트가 비어 있을 수도 있으므로(게임 착수 전) 위반 entry 를
+        # 직접 구성한다. 손상 상황 재현이 목적이라 manifest.py 를 일부러 우회한다.
+        data["entries"] = [{
+            "id": "art:BadCaps",  # 대문자 → 패턴 위반
+            "track": "art",
+            "status": "placeholder",
+            "spec": "게이트 #3 id 형식 위반 검증용 픽스처",
+            "requested_by": [{"kind": "scene_node", "path": "scenes/fixture.tscn::Sprite2D"}],
+            "file": None,
+            "history": [{"at": "2026-07-30T00:00:00+00:00", "action": "registered"}],
+        }]
         m2.write_text(json.dumps(data), encoding="utf-8")
         r = _verify(clone2, "--skip-godot")
         check("위반: 매니페스트 id 형식 (게이트 #3)",
@@ -215,43 +227,63 @@ def section_review() -> None:
         mpath = clone / "pipeline" / "manifest.json"
         spath = clone / "pipeline" / "schemas" / "asset-manifest.schema.json"
 
+        # 픽스처는 이 테스트가 복제본 안에 직접 만든다. 저장소에 어떤 게임 콘텐츠가
+        # 체크인되어 있든(또는 없든) 결과가 달라지지 않아야 한다 — 검증 대상 게임이
+        # 교체되어도 파이프라인 자체 테스트는 그대로 통과해야 하기 때문.
+        _manifest(mpath, spath, "add", "--id", "se:fixture_review",
+                  "--track", "se", "--status", "placeholder",
+                  "--spec", "review 왕복 검증용 픽스처 효과음",
+                  "--requested-by", "code_event:src/tools/fixture.gd::on_fixture",
+                  "--file", "assets/audio/se/PLACEHOLDER_fixture_review.ogg")
+        _manifest(mpath, spath, "add", "--id", "art:fixture/review_reject",
+                  "--track", "art", "--status", "placeholder",
+                  "--spec", "review 반려 검증용 픽스처 스프라이트",
+                  "--requested-by", "scene_node:scenes/fixture.tscn::Sprite2D",
+                  "--file", "assets/art/sprites/fixture/PLACEHOLDER_review_reject.png")
+        _manifest(mpath, spath, "add", "--id", "art:fixture/review_noreason",
+                  "--track", "art", "--status", "placeholder",
+                  "--spec", "reject --reason 누락 검증용 픽스처 스프라이트",
+                  "--requested-by", "scene_node:scenes/fixture.tscn::Sprite2D2",
+                  "--file", "assets/art/sprites/fixture/PLACEHOLDER_review_noreason.png")
+
         # placeholder 상태에서는 approve 거부 (상태 전이 규칙)
-        r = _review(clone, "approve", "--id", "se:player_step")
+        r = _review(clone, "approve", "--id", "se:fixture_review")
         check("placeholder approve 거부 (종료 2)", r.returncode == 2)
         check("거부 사유에 'generated' 안내", "generated" in r.stderr)
 
         # generated 로 만든 뒤 approve
-        _manifest(mpath, spath, "update-status", "--id", "se:player_step",
-                  "--status", "generated", "--file", "assets/audio/se/player_step.ogg")
+        _manifest(mpath, spath, "update-status", "--id", "se:fixture_review",
+                  "--status", "generated", "--file", "assets/audio/se/fixture_review.ogg")
         r = _review(clone, "list", "--json")
         queue = json.loads(r.stdout)
         check("큐: generated 에셋이 approve 후보에 등장",
-              any(a["id"] == "se:player_step" for a in queue["assets_pending"]))
-        r = _review(clone, "approve", "--id", "se:player_step")
+              any(a["id"] == "se:fixture_review" for a in queue["assets_pending"]))
+        r = _review(clone, "approve", "--id", "se:fixture_review")
         check("approve 종료 0", r.returncode == 0)
-        ent = _entry(mpath, spath, "se:player_step")
+        ent = _entry(mpath, spath, "se:fixture_review")
         check("approve 후 status=approved", ent.get("status") == "approved")
         check("history 에 approved 기록",
               "approved" in [h["action"] for h in ent.get("history", [])])
 
         # 멱등: 이미 approved → 재승인 안내
-        r = _review(clone, "approve", "--id", "se:player_step")
+        r = _review(clone, "approve", "--id", "se:fixture_review")
         check("재approve 멱등 (종료 0)", r.returncode == 0 and "멱등" in r.stdout)
 
         # reject + 피드백 (generated 대상)
-        _manifest(mpath, spath, "update-status", "--id", "art:tiles/floor",
+        _manifest(mpath, spath, "update-status", "--id", "art:fixture/review_reject",
                   "--status", "generated")
-        r = _review(clone, "reject", "--id", "art:tiles/floor", "--reason", "픽셀 정합 불량")
+        r = _review(clone, "reject", "--id", "art:fixture/review_reject",
+                    "--reason", "픽셀 정합 불량")
         check("reject 종료 0", r.returncode == 0)
-        ent = _entry(mpath, spath, "art:tiles/floor")
+        ent = _entry(mpath, spath, "art:fixture/review_reject")
         check("reject 후 status=rejected", ent.get("status") == "rejected")
         check("history 피드백 기록",
               ent.get("history", [])[-1].get("feedback") == "픽셀 정합 불량")
 
         # reject 는 --reason 필수
-        _manifest(mpath, spath, "update-status", "--id", "art:player/player_idle",
+        _manifest(mpath, spath, "update-status", "--id", "art:fixture/review_noreason",
                   "--status", "generated")
-        r = _review(clone, "reject", "--id", "art:player/player_idle")
+        r = _review(clone, "reject", "--id", "art:fixture/review_noreason")
         check("reject --reason 누락 → 종료 2", r.returncode == 2)
 
         # 갱신 후에도 매니페스트 유효 (단일 창구 통과)
@@ -307,10 +339,10 @@ def section_full_guard() -> None:
 
 
 # ---------------------------------------------------------------------------
-# [6] 회귀 (기존 러너 5종 통과 유지)
+# [6] 회귀 (기존 러너 4종 통과 유지)
 # ---------------------------------------------------------------------------
 def section_regression() -> None:
-    print("\n[6] 회귀 — 기존 러너 5종 통과 유지")
+    print("\n[6] 회귀 — 기존 러너 4종 통과 유지")
     if UNDER_FULL:
         print("  [SKIP] verify --full 안에서 호출됨 — 러너는 verify --full 이 직접 실행하므로 중복 생략")
         return
@@ -320,11 +352,9 @@ def section_regression() -> None:
         r = _run([sys.executable, str(TESTS_DIR / name)])
         check(f"{name} 통과", r.returncode == 0)
 
-    if _have_godot():
-        r = _run([sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")])
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
-    else:
-        print("  [SKIP] godot 없음 — acceptance 러너 생략")
+    # 기능 수용 테스트(run_acceptance_*.py)는 검증 대상 게임에 종속이므로 여기서
+    # 고정 호출하지 않는다. verify --full 이 pipeline/tests/run_*.py 를 자동 발견해
+    # 실행하므로, 새 게임의 play build 가 수용 테스트를 만들면 자동으로 포함된다.
 
 
 def main() -> int:

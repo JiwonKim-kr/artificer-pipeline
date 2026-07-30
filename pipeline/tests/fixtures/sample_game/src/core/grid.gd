@@ -4,7 +4,7 @@ extends RefCounted
 ##
 ## 맵 데이터(타일 크기·맵 크기·차단 셀)는 생성 시 **주입**받는다. 장르/스타일
 ## 상수를 코드에 박지 않는다(파이프라인 범용성 — CLAUDE.md/HANDOFF §6-3).
-## spec: docs/specs/player_movement.md (grid.gd 역할).
+## [sample_game 픽스처] 파이프라인 자체 테스트용 그리드 로직(원래 spec: player_movement, 제거됨).
 
 var tile_size: int = 16
 var map_width: int = 0

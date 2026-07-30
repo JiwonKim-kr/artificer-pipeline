@@ -1,13 +1,16 @@
 extends SceneTree
-## 승인 spec `player_movement` 의 수용 기준 1~4 를 헤드리스로 검증하는 자동 테스트.
+## [sample_game 픽스처] 파이프라인 자체 테스트용 수용 기준 검증 스크립트.
+## 예전 검증 데모(player_movement)의 수용 기준 1~4 를 헤드리스로 확인한다. 데모는
+## 저장소에서 제거되고 이 픽스처로만 남는다(main = 게임 없는 파이프라인 정본).
 ##
 ## 스모크(게이트 #2)가 확인하지 못하는 "이동/차단/경계/정렬" 행위를 Player 를
 ## 직접 인스턴스화해 검증한다. Grid/Player 스크립트를 preload 로 직접 사용하므로
 ## 씬/글로벌 클래스 캐시에 의존하지 않는다.
 ##
-## 실행: godot --headless --path <repo> --script res://pipeline/tests/acceptance_player_movement.gd
+## 실행: sample_game.install() 이 이 파일을 복제본의
+##   res://pipeline/tests/acceptance_player_movement.gd 로 깔고,
+##   run_acceptance_player_movement.py --project <복제본> 이 호출한다.
 ## 결과: 마지막 줄에 ACCEPT_RESULT: PASS | FAIL 를 출력하고 종료 코드로도 알린다.
-## spec: docs/specs/player_movement.md
 
 const GridScript := preload("res://src/core/grid.gd")
 const PlayerScript := preload("res://src/core/player.gd")

@@ -14,7 +14,8 @@ Phase 1/2 의 run_lore_roundtrip.py / run_play_pipeline.py 와 같은 스타일
   [4] art_reskin      : 저장소 전체를 임시 디렉토리에 복제해 placeholder→generated 왕복.
                         dry-run 무변경, 적용 후 tscn 경로·매니페스트 상태 확인,
                         실제 에셋 부재 시 skip. (godot 있으면 재임포트+play_test 까지.)
-  [5] 회귀            : 기존 러너(lore roundtrip / play pipeline / acceptance) 통과 유지.
+  [5] 회귀            : 기존 러너(lore roundtrip / play pipeline) 통과 유지.
+                        (수용 테스트는 art_reskin 의 godot 종단 경로에서 실행.)
 
 CLAUDE.md 규칙: 실데이터(assets/, scenes/, pipeline/manifest.json, src/)는 절대
 수정하지 않는다. 모든 쓰기 검사는 임시 사본/임시 디렉토리 대상.
@@ -35,11 +36,13 @@ REPO_ROOT = TESTS_DIR.parent.parent
 SCRIPTS = TESTS_DIR.parent / "scripts"
 
 sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(TESTS_DIR / "fixtures" / "sample_game"))
 import env_config as env_mod  # noqa: E402
 import scenario_client as sc  # noqa: E402
 import art_reskin as reskin_mod  # noqa: E402
 import placeholder_gen  # noqa: E402
 import verify as verify_mod  # noqa: E402
+import sample_game  # noqa: E402  (검증 대상 게임에 무관한 테스트 픽스처)
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -280,9 +283,13 @@ def section_art_post() -> None:
 # [4] art_reskin (임시 복제본)
 # ---------------------------------------------------------------------------
 def _clone_repo(dst: Path) -> None:
+    # fixtures 는 복제하지 않는다: sample_game 은 install() 이 정규 경로로 깔고,
+    # 픽스처 안의 player.tscn 이 복제본에 남으면 placeholder 를 참조하는 "다른 씬"으로
+    # 오인되어 reskin 이 보수적으로 삭제를 보류한다(테스트 오검출).
     shutil.copytree(
         REPO_ROOT, dst,
-        ignore=shutil.ignore_patterns(".git", ".godot", "__pycache__", "*.pyc", "export"),
+        ignore=shutil.ignore_patterns(
+            ".git", ".godot", "__pycache__", "*.pyc", "export", "fixtures"),
     )
 
 
@@ -316,6 +323,11 @@ def section_art_reskin() -> None:
     with tempfile.TemporaryDirectory() as td:
         clone = Path(td) / "clone"
         _clone_repo(clone)
+        # 검증 대상 게임에 무관한 sample_game 픽스처를 복제본에 설치(저장소엔 게임 없음)
+        sample_game.install(clone)
+        ra = sample_game.register_art(clone)
+        rs = sample_game.register_se(clone)
+        check("픽스처 매니페스트 등록 성공", ra.returncode == 0 and rs.returncode == 0)
         mpath = clone / "pipeline" / "manifest.json"
         spath = clone / "pipeline" / "schemas" / "asset-manifest.schema.json"
         scene = clone / "scenes" / "player.tscn"
@@ -383,6 +395,8 @@ def section_art_reskin() -> None:
         #     교체 후에도 삭제하지 않고 보류해야 한다(씬 텍스처 깨짐 방지).
         clone_share = Path(td) / "clone_share"
         _clone_repo(clone_share)
+        sample_game.install(clone_share)
+        sample_game.register_manifest(clone_share)
         ph_s = clone_share / "assets" / "art" / "sprites" / "player" / "PLACEHOLDER_player_idle.png"
         real_s = clone_share / "assets" / "art" / "sprites" / "player" / "player_idle.png"
         shutil.copy(ph_s, real_s)
@@ -401,16 +415,19 @@ def section_art_reskin() -> None:
         check("(공유) 보류 시 다른 씬의 placeholder 참조 보존",
               "PLACEHOLDER_player_idle" in extra_scene.read_text(encoding="utf-8"))
 
-        # 원본 저장소 불변 확인
-        orig_scene = (REPO_ROOT / "scenes" / "player.tscn").read_text(encoding="utf-8")
-        check("원본 저장소 scenes/player.tscn 불변", "PLACEHOLDER_player_idle" in orig_scene)
-        check("원본 저장소 placeholder 파일 불변",
-              (REPO_ROOT / "assets/art/sprites/player/PLACEHOLDER_player_idle.png").exists())
+        # 실데이터 보호: 저장소에는 게임 콘텐츠가 없고(픽스처에만 존재), 픽스처는 불변
+        check("저장소 scenes/ 에 게임 씬 없음(픽스처에만 존재)",
+              not (REPO_ROOT / "scenes" / "player.tscn").exists())
+        check("픽스처 원본 placeholder 불변",
+              "PLACEHOLDER_player_idle" in (sample_game.FIXTURE_DIR / "scenes/player.tscn").read_text(encoding="utf-8")
+              and (sample_game.FIXTURE_DIR / "assets/art/sprites/player/PLACEHOLDER_player_idle.png").exists())
 
         # godot 있으면 재임포트 + play_test 까지 (강한 종단 증명)
         if _have_godot():
             clone2 = Path(td) / "clone2"
             _clone_repo(clone2)
+            sample_game.install(clone2)
+            sample_game.register_manifest(clone2)
             shutil.copy(
                 clone2 / "assets/art/sprites/player/PLACEHOLDER_player_idle.png",
                 clone2 / "assets/art/sprites/player/player_idle.png",
@@ -448,14 +465,9 @@ def section_regression() -> None:
     )
     check("run_play_pipeline.py 통과", r.returncode == 0)
 
-    if _have_godot():
-        r = subprocess.run(
-            [sys.executable, str(TESTS_DIR / "run_acceptance_player_movement.py")],
-            capture_output=True, text=True,
-        )
-        check("run_acceptance_player_movement.py 통과", r.returncode == 0)
-    else:
-        print("  [SKIP] godot 없음 — acceptance 러너 생략")
+    # 수용 러너(sample_game)는 section_art_reskin 의 godot 경로에서 reskin 후
+    # play_test 로 종단 검증한다. 픽스처로 이전되어 저장소 게임에 의존하지 않으므로
+    # 여기서 별도 호출하지 않는다.
 
 
 def main() -> int:

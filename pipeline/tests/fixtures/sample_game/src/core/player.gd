@@ -5,7 +5,8 @@ extends Node2D
 ## 입력 → 그리드 좌표 갱신 → 월드 좌표 보간. 이동 가능 판정은 Grid 에 위임한다.
 ## 타일 크기·맵 데이터는 코드에 하드코딩하지 않고 export(주입 데이터)로 받는다
 ## (장르 상수 금지 — CLAUDE.md/HANDOFF §6-3).
-## spec: docs/specs/player_movement.md (수용 기준 1~4).
+## [sample_game 픽스처] 파이프라인 자체 테스트용. 예전 검증 데모의 player 로직으로,
+## 저장소에서 제거되고 이 픽스처로만 남는다(원래 spec: player_movement, 함께 제거됨).
 
 ## 한 칸 이동이 완료된 지점. `se attach` 가 발소리 SE 를 연결하는 code_event.
 signal step_completed(cell: Vector2i)
