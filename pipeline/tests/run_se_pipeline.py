@@ -87,7 +87,10 @@ def _sha256(path: Path) -> str:
 
 
 def _run(cmd: list[str], **kw) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    # encoding 고정: Windows 에서 자식 cp949 출력 ↔ 부모 utf-8 디코드가 어긋나면
+    # 리더 스레드가 죽어 stdout/stderr 가 None 이 된다.
+    return subprocess.run(cmd, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", **kw)
 
 
 def _jsfxr_render(spec: dict, out: Path, *extra: str) -> subprocess.CompletedProcess[str]:
@@ -309,7 +312,8 @@ def section_elevenlabs() -> None:
     check("dry-run 표시에 키 마스킹", "k123secret" not in disp and "k123" in disp)
 
     # CLI: 키 부재 → 종료 코드 3, 스택트레이스 없음
-    clean_env = {"PATH": os.environ.get("PATH", "")}  # ELEVENLABS_* 제거된 깨끗한 환경
+    # ELEVENLABS_* 제거된 깨끗한 환경. PYTHONUTF8 은 남긴다(Windows cp949 출력 방지).
+    clean_env = {"PATH": os.environ.get("PATH", ""), "PYTHONUTF8": "1"}
     with tempfile.TemporaryDirectory() as td:
         r = _run([sys.executable, str(SCRIPTS / "elevenlabs_client.py"),
                   "generate", "--text", "x", "--env", str(Path(td) / "none.env")],
