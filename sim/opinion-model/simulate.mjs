@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { initState, step, isWon, macroOpinion, contestedness } from "./opinion-model.mjs";
 
-const config = JSON.parse(readFileSync(new URL("./config.json", import.meta.url)));
+const config = JSON.parse(readFileSync(new URL("../../src/core/data/opinion_config.json", import.meta.url)));
 const SEG = config.segments.map((s) => s.id);
 const LABEL = Object.fromEntries(config.segments.map((s) => [s.id, s.label]));
 

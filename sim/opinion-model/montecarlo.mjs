@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { initState, step, isWon } from "./opinion-model.mjs";
-const config = JSON.parse(readFileSync(new URL("./config.json", import.meta.url)));
+const config = JSON.parse(readFileSync(new URL("../../src/core/data/opinion_config.json", import.meta.url)));
 
 function runOnce(play, seed) {
   const st = initState(config, seed);
