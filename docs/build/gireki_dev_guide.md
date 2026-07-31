@@ -48,16 +48,21 @@
 ## 4. 게임 규칙 요약 (코드에 반영됨)
 - **논조 도출**: `lean = 유리노출 + 불리은폐 − 불리노출` → `frameValue = clamp(0.5 + k_lean·lean, 0.2, 0.8)`.
   `δ(발각) = clamp01(w_omit · 불리은폐수)`. (turn_manager.publish)
-- **승/패·엔딩**(check_ending, 우선순위): 발각 2회+ → **발각파탄** / 압박 4회+ → **배신파탄** /
+- **승/패·엔딩**(check_ending, 우선순위): 발각 **3회+**(`DETECT_BREAK`, C6에서 2→3 완화 —
+  근거 `docs/build/c6_balance.md`) → **발각파탄** / 압박 4회+(`PRESSURE_BREAK`) → **배신파탄** /
   부동층 ≥ winThreshold → **성공** / turn ≥ maxTurns → **실패**.
-- **압박**: 반대각 기사 낼 때마다 +1, 단계별 암시 문구(수치 비표시). 4 초과 → 배신파탄.
+- **후일담**(C5, 성공 엔딩만): F15(형 테오)를 발견하고도 지면에서 뺐으면 **냉혹**, 그 외 **정직**
+  (`turn_manager.epilogue()` → `main.gd`의 `EPILOGUES`).
+- **압박**: 반대각 기사 낼 때마다 +1, 단계별 암시 문구(수치 비표시). 4 도달 → 배신파탄.
 - **분기**: F15는 `discover_theo()`(데스크 "책상 뒤지기")로만 등장(hidden). F16은 F7을 **반대각 보도**하면
   열림(gated), 찬성/중립 보도면 닫힘(편집장 메일 흔적).
 - **태그 비노출**: 유리/불리/중립은 절대 UI에 보이지 않는다(플레이어가 판단).
 
 ## 5. 실행 & 검증 (이 저장소)
-- 도구: Godot 4.5.1(로컬)/4.6.x(CI), Node 20, Python 3. **Windows는 python 앞에 `PYTHONUTF8=1`**(cp949 회피).
-- `GODOT_BIN` 예(이 PC): `/c/Users/<계정>/Desktop/Godot_v4.5.1-stable_win64.exe/Godot_v4.5.1-stable_win64_console.exe`
+- 도구: **Godot 4.6.x 고정**(CLAUDE.md 코딩 규칙 · CI/배포도 4.6.3), Node 20, Python 3.
+  **Windows는 python 앞에 `PYTHONUTF8=1`**(cp949 회피). 로컬에 다른 버전(예 4.5.1)이 있어도
+  검증 기준은 4.6.x다 — 버전 차이로 인한 임포트/렌더 차이는 CI 결과를 정본으로 본다.
+- `GODOT_BIN` 예(Windows): `/c/Users/<계정>/Desktop/Godot_v4.6.3-stable_win64_console.exe`
 ```bash
 # 임포트
 "$GODOT_BIN" --headless --path . --import
@@ -78,8 +83,11 @@ PYTHONUTF8=1 GODOT_BIN="$GODOT_BIN" python pipeline/scripts/play_test.py --scree
   `hidden:true`(책상 발견형) / `gated:true`(F16류 개폐형) 옵션. → `get_blocks`에 자동 반영, 코드 무수정.
 - **댓글 추가**: `comments`에 `{seg,reaction,frame,topic,text}`. 선택은 seg+reaction 우선, frame/topic 가점.
 - **밸런싱**: `opinion_config.json`(k·epsMax·anchorLambda·detection·`mission.maxTurns`/`winThreshold`) +
-  `lever_tuning.json`(w_omit·k_lean). ⚠️ **opinion_config를 바꾸면 `node pipeline/tests/dump_opinion_golden.mjs`로
+  `lever_tuning.json`(w_omit·k_lean) + 파탄임계 `turn_manager.DETECT_BREAK`(게임 계층 상수).
+  ⚠️ **opinion_config를 바꾸면 `node pipeline/tests/dump_opinion_golden.mjs`로
   골든 재생성** 후 parity 재확인(안 하면 대조 테스트가 깨진다).
+  ⚠️ `DETECT_BREAK` 변경 시 `sim/opinion-model/balance_montecarlo.mjs`의 `RUIN_AT`도 같이 맞추고
+  재실행해 난이도 곡선을 재확인(`docs/build/c6_balance.md` 갱신).
 - **엔딩 추가/수정**: `turn_manager.check_ending()` 조건 + `main.gd`의 `ENDINGS` 문구.
 - **압박 단계**: `turn_manager`의 `PRESSURE_HINTS` / `PRESSURE_BREAK`.
 
@@ -91,10 +99,12 @@ PYTHONUTF8=1 GODOT_BIN="$GODOT_BIN" python pipeline/scripts/play_test.py --scree
 | C1 다중턴+승/패+엔딩3종 · C3 압박+배신엔딩 · C4 분기(F15/F16) | ✅ |
 | 엔딩 4종 도달 | ✅ (성공/실패/발각파탄/배신파탄) |
 | **C6 밸런싱**(maxTurns=8·파탄임계 3 확정) · topic 정본 정리(F14→실업 매핑, 임금 댓글은 베이킹에서) | ✅ (`docs/build/c6_balance.md`) |
-| **C5 후일담**(엔딩 정직/냉혹 분기 문구) | ⬜ (문구 필요) |
-| **콘텐츠 대량 베이킹**(F 전체·댓글 변주) | ⬜ 사람+오프라인 LLM(스토리 §10) |
-| **아트/사운드**: 배경 16:9 최종 reskin · 게이지 아트 · se gen/attach | ⬜ (placeholder 상태) |
-| **웹 export → GitHub Pages** | ⬜ (실측은 `docs/web-export.md`) |
+| **C5 후일담**(성공 엔딩 정직/냉혹 분기 — F15 은폐 여부로 판정) | ✅ (`turn_manager.epilogue()` + `EPILOGUES`) |
+| 댓글 반복방어(쿨다운 큐 + 표현층 별도 RNG) + 시드 흡수 | ✅ (`COMMENT_COOLDOWN`, 발각 RNG와 분리) |
+| 웹 빌드 한글 폰트 번들(neodgm) + Pages 배포 워크플로 | ✅ (`deploy-web.yml`, 수동 트리거) |
+| **콘텐츠 대량 베이킹**(F 전체·댓글 변주 — 임금 topic 댓글 필수 포함) | ⬜ 사람+오프라인 LLM(스토리 §10) |
+| **아트/사운드**: 배경 16:9 최종 reskin · 게이지 아트 · se gen/attach | ⬜ (placeholder 상태, art lock 대기) |
+| **웹 export → GitHub Pages 실제 배포 확인** | ⬜ (워크플로는 준비됨 — Actions 탭에서 수동 실행, 선행: Settings→Pages→Source=GitHub Actions) |
 
 ## 8. 주의점
 - **엔진 로직 수정 시** 반드시 sim(오라클)과 대조(parity). config 변경 시 골든 재생성.

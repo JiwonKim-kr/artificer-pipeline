@@ -12,8 +12,10 @@ title: Phase C1 — 다중 턴 루프 + 승/패 + 엔딩
 
 # 동작
 - 발행 = 1턴 진행(`model.turn++`). 턴 카운터 `N / maxTurns` 표시.
-- 매 발행 후 종료 판정(우선순위): 발각 2회 이상 → **발각파탄** / 부동층 ≥ winThreshold → **성공** /
+- 매 발행 후 종료 판정(우선순위): 발각 **3회** 이상 → **발각파탄** / 부동층 ≥ winThreshold → **성공** /
   turn ≥ maxTurns → **실패** / 그 외 → 진행.
+  > [C6 개정 2026-07-31] 발각 임계 2→3 완화. 최적 플레이(은폐1)의 파탄률 26.4%→5.3%
+  > (sim 몬테카를로 N=4000, 사람 결정). 근거: `docs/build/c6_balance.md`, 코드: `turn_manager.DETECT_BREAK`.
 - 종료 시 엔딩 화면(제목+문구) 표시, 발행 비활성.
 - `maxTurns`·`winThreshold`·`target`은 `opinion_config.json`(mission)에서 읽는다(단일 출처).
 - 콘텐츠는 대표 사실(현행 F1·F2)로 매 턴 제공(턴별 비트시트 콘텐츠는 C2).
@@ -26,7 +28,7 @@ title: Phase C1 — 다중 턴 루프 + 승/패 + 엔딩
 # 수용 기준
 1. maxTurns 회 발행 시 `over=true`, `ending ∈ {성공, 실패, 발각파탄}`.
 2. 부동층이 winThreshold 도달 시 즉시 **성공** 엔딩.
-3. 발각 2회 누적 시 **발각파탄** 엔딩.
+3. 발각 3회 누적 시 **발각파탄** 엔딩. (C6 개정: 2→3, `docs/build/c6_balance.md`)
 4. 종료 후 발행 버튼 비활성. play_test PASS, parity 불변.
 
 # 후속 (Phase C)
