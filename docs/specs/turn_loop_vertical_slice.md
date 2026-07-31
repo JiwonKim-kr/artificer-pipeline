@@ -1,5 +1,5 @@
 ---
-status: draft
+status: approved
 track: play
 name: turn_loop_vertical_slice
 title: 「태엽 인간」 Phase B — 1턴 수직 슬라이스 (정면 모니터 · 레트로 OS UI · 여론엔진 이식)

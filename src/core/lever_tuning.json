@@ -1,0 +1,6 @@
+{
+  "_meta": "왜곡 레버 → δ 매핑 가중치 (게임 계층). 모델 config(opinion_config.json)와 분리. spec: docs/specs/turn_loop_vertical_slice.md",
+  "w_omit": 0.34,
+  "w_reorder": 0.15,
+  "w_exagg": 0.34
+}
