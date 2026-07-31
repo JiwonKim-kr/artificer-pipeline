@@ -21,6 +21,7 @@ Claude(오케스트레이터)는 아래 규칙을 항상 따른다.
 | 경로 | 용도 | 비고 |
 |---|---|---|
 | `src/core/` | 게임 핵심 로직 | 사람이 승인한 spec 없이 수정 금지 |
+| `src/core/data/` | 런타임 데이터 (모델 config·콘텐츠·튜닝 JSON) | 승인된 spec 기반. 웹빌드 포함 |
 | `src/ui/`, `src/tools/` | 보조 코드, 에디터 툴 | AI 자유 작업 영역 |
 | `assets/art/` | 그래픽 (concepts/sprites/ui) | `art gen`만이 쓰기 |
 | `assets/audio/se/`, `assets/audio/bgm/` | 사운드 | OGG, 라우드니스 정규화 필수 |
