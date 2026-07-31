@@ -92,7 +92,9 @@ export function initState(config, seed = 1) {
 // article: {frame:"찬성각"|..., tone, channel, distortion}
 export function step(config, state, article) {
   const C = config.constants;
-  const frameValue = config.levers.frame[article.frame];
+  // frameValue 직접 수용(게임 계층은 lean→연속값 0.2~0.8 을 넘긴다 — turn_manager.publish).
+  // 이름("찬성각" 등) 매핑은 기존 러너 하위호환. GDScript 이식(opinion_model.gd)과 동일 계약.
+  const frameValue = article.frameValue ?? config.levers.frame[article.frame];
   const a = { ...article, frameValue };
 
   // 평판: 직전 논조 대비 반대 방향으로 급변하면 하락, 유지하면 회복.

@@ -90,7 +90,7 @@ PYTHONUTF8=1 GODOT_BIN="$GODOT_BIN" python pipeline/scripts/play_test.py --scree
 | 1턴 슬라이스 UI(CRT OS·문장취사·댓글·게이지) | ✅ |
 | C1 다중턴+승/패+엔딩3종 · C3 압박+배신엔딩 · C4 분기(F15/F16) | ✅ |
 | 엔딩 4종 도달 | ✅ (성공/실패/발각파탄/배신파탄) |
-| **C6 밸런싱**(maxTurns·상수 확정) · topic 정본(요나스반전/임금) 정리 | ⬜ |
+| **C6 밸런싱**(maxTurns=8·파탄임계 3 확정) · topic 정본 정리(F14→실업 매핑, 임금 댓글은 베이킹에서) | ✅ (`docs/build/c6_balance.md`) |
 | **C5 후일담**(엔딩 정직/냉혹 분기 문구) | ⬜ (문구 필요) |
 | **콘텐츠 대량 베이킹**(F 전체·댓글 변주) | ⬜ 사람+오프라인 LLM(스토리 §10) |
 | **아트/사운드**: 배경 16:9 최종 reskin · 게이지 아트 · se gen/attach | ⬜ (placeholder 상태) |

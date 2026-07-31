@@ -15,6 +15,10 @@ const PRESSURE_HINTS := {
 	3: "편집국 앞을 '강철 손'이 서성인다. 이번이 마지막 경고다.",
 }
 const PRESSURE_BREAK := 4  # 반대 기사 누적 임계 → 배신파탄
+# 발각 누적 임계 → 발각파탄. 2→3 완화(C6): 최적 플레이(은폐1)의 파탄률 26.4%→5.3%로
+# 심사자 1회 플레이가 운으로 끝나는 일을 줄이되, 과욕(은폐2+)은 파탄 24%+실패 40%로
+# 여전히 벌받는다. 근거 수치: docs/build/c6_balance.md (sim 몬테카를로 N=4000)
+const DETECT_BREAK := 3
 
 var model: OpinionModel
 var content: Dictionary
@@ -31,9 +35,10 @@ func _init(seed: int = 1) -> void:
 	model = OpinionModel.new(cfg, seed)
 	max_turns = int((cfg.get("mission", {}) as Dictionary).get("maxTurns", 8))
 
-## 종료 판정: 발각 2회+ → 발각파탄 / 목표 도달 → 성공 / maxTurns 도달 → 실패 / 그 외 진행("").
+## 종료 판정: 발각 DETECT_BREAK회+ → 발각파탄 / 압박 누적 → 배신파탄 / 목표 도달 → 성공
+## / maxTurns 도달 → 실패 / 그 외 진행("").
 func check_ending() -> String:
-	if model.detections.size() >= 2:
+	if model.detections.size() >= DETECT_BREAK:
 		return "발각파탄"
 	if pressure >= PRESSURE_BREAK:
 		return "배신파탄"

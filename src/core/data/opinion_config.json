@@ -84,8 +84,8 @@
     "_desc": "데모 미션 1개. target 세그먼트를 winThreshold 이상으로 마감일까지 전향.",
     "target": "sns_swing",
     "winThreshold": 0.65,
-    "maxTurns": 10,
-    "_maxTurns": "임시값. 시뮬 검증(A2)으로 확정."
+    "maxTurns": 8,
+    "_maxTurns": "확정(C6). 스토리 v0.3 규격 8턴 + sim 몬테카를로(N=4000)에서 8턴 vs 10턴 결과 차이 없음(승부는 5~7턴에 남). 근거: docs/build/c6_balance.md"
   },
 
   "detection": {
