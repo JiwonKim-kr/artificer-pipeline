@@ -1,8 +1,7 @@
 extends SceneTree
-## 1턴 흐름(turn_manager) 헤드리스 테스트 — 레버→δ→step→댓글.
+## 1턴 흐름(turn_manager) 헤드리스 테스트 — 문장 블록 취사 → 기울기·δ → step.
 ## 실행: godot --headless --path <repo> --script res://pipeline/tests/turn_flow_test.gd
-## 결과: 마지막 줄 TURN_RESULT: PASS | FAIL, 종료코드로도 알림.
-## spec: docs/specs/turn_loop_vertical_slice.md
+## 결과: 마지막 줄 TURN_RESULT: PASS | FAIL. spec: docs/specs/turn_loop_vertical_slice.md
 
 const EPS := 1e-9
 
@@ -17,40 +16,55 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	# --- 1) 정직 발행: δ=0, 부동층 상승, 댓글 세그먼트별 반환 ---
-	var r1 := tm.publish({
-		"frame": "찬성각", "tone": "자극", "channel": "sns", "topic": "생산성",
-		"omitted_unfavorable": 0, "reorder": false, "exaggerate": false,
-	})
+	var all_ids: Array = []
+	var non_unf_ids: Array = []   # 불리가 아닌 블록만(=불리 은폐)
+	var unf_ids: Array = []
+	for b in tm.get_blocks():
+		all_ids.append(b["id"])
+		if str(b["tag"]) == "불리":
+			unf_ids.append(b["id"])
+		else:
+			non_unf_ids.append(b["id"])
+	var total_unf: int = unf_ids.size()
+	var w_omit: float = float(tm.tuning["w_omit"])
+
+	# 1) 전부 포함(정직): δ=0, 부동층 상승
+	var r1 := tm.publish({"included_ids": all_ids})
 	if absf(float(r1["distortion"])) > EPS:
-		print("[FAIL] 정직인데 δ != 0 (%.4f)" % float(r1["distortion"])); failures += 1
-	var swing1: float = float(r1["snapshot"]["xs"]["sns_swing"])
-	if swing1 <= 0.5:
-		print("[FAIL] 정직 찬성각 1턴인데 부동층 미상승 (%.6f)" % swing1); failures += 1
-	var comments1: Array = r1["comments"]
-	if comments1.size() < 2:
-		print("[FAIL] 댓글이 2개 미만 (%d)" % comments1.size()); failures += 1
+		print("[FAIL] 전부 포함인데 δ != 0 (%.4f)" % float(r1["distortion"])); failures += 1
+	if float(r1["snapshot"]["xs"]["sns_swing"]) <= 0.5:
+		print("[FAIL] 정직 보도 1턴 부동층 미상승"); failures += 1
+	if (r1["comments"] as Array).size() < 2:
+		print("[FAIL] 댓글 2개 미만"); failures += 1
 	if failures == 0:
-		print("[PASS] 정직 발행: δ=0, 부동층 %.6f, 댓글 %d개" % [swing1, comments1.size()])
+		print("[PASS] 전부 포함(정직): δ=0, 부동층 %.3f, 댓글 %d" % [float(r1["snapshot"]["xs"]["sns_swing"]), (r1["comments"] as Array).size()])
 
-	# --- 2) 왜곡 발행: 불리 1개 누락 → δ = w_omit ---
-	var r2 := tm.publish({
-		"frame": "찬성각", "tone": "자극", "channel": "sns", "topic": "안전",
-		"omitted_unfavorable": 1, "reorder": false, "exaggerate": false,
-	})
-	var expect_delta: float = float(tm.tuning["w_omit"])
-	if absf(float(r2["distortion"]) - expect_delta) > EPS:
-		print("[FAIL] 누락 δ 기대 %.4f 실제 %.4f" % [expect_delta, float(r2["distortion"])]); failures += 1
+	# 2) 불리 은폐(불리만 제외): δ = w_omit*total_unf, 논조=찬성각
+	var r2 := tm.publish({"included_ids": non_unf_ids})
+	if absf(float(r2["distortion"]) - w_omit * float(total_unf)) > EPS:
+		print("[FAIL] 불리은폐 δ 기대 %.4f 실제 %.4f" % [w_omit * total_unf, float(r2["distortion"])]); failures += 1
+	elif str(r2["frame_label"]) != "찬성각":
+		print("[FAIL] 불리은폐 논조 기대 찬성각 실제 %s" % str(r2["frame_label"])); failures += 1
 	else:
-		print("[PASS] 왜곡 발행: 누락 1개 → δ=%.4f" % float(r2["distortion"]))
+		print("[PASS] 불리 은폐: δ=%.2f, 논조=%s" % [float(r2["distortion"]), str(r2["frame_label"])])
 
-	# --- 3) 과장+재배치 결합 δ 산출 ---
-	var d3: float = tm.compute_distortion(2, true, true)
-	var expect3: float = clampf(float(tm.tuning["w_omit"]) * 2.0 + float(tm.tuning["w_reorder"]) + float(tm.tuning["w_exagg"]), 0.0, 1.0)
-	if absf(d3 - expect3) > EPS:
-		print("[FAIL] 결합 δ 기대 %.4f 실제 %.4f" % [expect3, d3]); failures += 1
+	# 3) 미보도(전부 제외): δ = w_omit*total_unf, reported 비어있음
+	var r3 := tm.publish({"included_ids": []})
+	if absf(float(r3["distortion"]) - w_omit * float(total_unf)) > EPS:
+		print("[FAIL] 미보도 δ 기대 %.4f 실제 %.4f" % [w_omit * total_unf, float(r3["distortion"])]); failures += 1
+	elif not (r3["reported_facts"] as Array).is_empty():
+		print("[FAIL] 미보도인데 보도 사실 존재"); failures += 1
 	else:
-		print("[PASS] 결합 δ(누락2+재배치+과장) = %.4f" % d3)
+		print("[PASS] 미보도: δ=%.2f (불리 은폐로 취급), 보도 0건" % float(r3["distortion"]))
+
+	# 4) 불리만 보도: δ=0, 논조=반대각
+	var r4 := tm.publish({"included_ids": unf_ids})
+	if absf(float(r4["distortion"])) > EPS:
+		print("[FAIL] 불리만 보도인데 δ != 0"); failures += 1
+	elif str(r4["frame_label"]) != "반대각":
+		print("[FAIL] 불리만 보도 논조 기대 반대각 실제 %s" % str(r4["frame_label"])); failures += 1
+	else:
+		print("[PASS] 불리만 보도: δ=0, 논조=%s" % str(r4["frame_label"]))
 
 	if failures == 0:
 		print("TURN_RESULT: PASS")

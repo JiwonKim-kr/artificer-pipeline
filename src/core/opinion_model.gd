@@ -105,7 +105,8 @@ func update_segment(seg: Dictionary, x: float, article: Dictionary, R: float) ->
 ## article: {frame, tone, channel, distortion?}
 func step(article: Dictionary) -> Dictionary:
 	var C: Dictionary = config["constants"]
-	var frame_value: float = float(config["levers"]["frame"][article["frame"]])
+	# 프레임: 직접 frameValue 를 받으면 사용(게임 계층에서 도출), 없으면 레버 키로 조회.
+	var frame_value: float = float(article["frameValue"]) if article.has("frameValue") else float(config["levers"]["frame"][article["frame"]])
 	var a: Dictionary = article.duplicate()
 	a["frameValue"] = frame_value
 

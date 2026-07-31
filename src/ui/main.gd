@@ -1,24 +1,17 @@
 extends Control
 ## 「태엽 인간」 1턴 수직 슬라이스 UI 컨트롤러.
 ## 데스크(정적 배경) → 모니터 클릭 → 전체화면 CRT OS UI(정보원·원고작성·댓글·게이지).
+## 원고 작성 = 문장 블록 취사(넣을지 말지). 유리/불리는 노출하지 않음(플레이어 판단).
 ## 로직은 TurnManager(코어)에 위임. 마우스/클릭 전용. spec: docs/specs/turn_loop_vertical_slice.md
 
 const DESK_BG := "res://assets/art/ui/main/PLACEHOLDER_desk_bg.png"
 const GAUGE_TEX := "res://assets/art/ui/gauge/PLACEHOLDER_opinion_needle.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
 
-const FRAMES := ["반대각", "중립", "찬성각"]
-const TONES := ["자극", "중립", "차분"]
-const CHANNELS := ["old", "sns"]
-
 var _tm: TurnManager
 var _desk: Control
 var _screen: Control
-var _frame_group: ButtonGroup
-var _tone_group: ButtonGroup
-var _channel_group: ButtonGroup
-var _exagg_check: CheckBox
-var _omit_checks: Array[CheckBox] = []
+var _block_checks: Array = []  # [{cb: CheckBox, id: String}]
 var _comments_box: VBoxContainer
 var _needle: Line2D
 var _status_label: Label
@@ -63,7 +56,6 @@ func _build_desk() -> void:
 	_desk.add_child(btn)
 
 func _enter_screen() -> void:
-	# 줌 인 연출(간단): 데스크 페이드아웃 → 스크린 표시.
 	_desk.visible = false
 	_screen.visible = true
 
@@ -75,7 +67,7 @@ func _build_screen() -> void:
 	add_child(_screen)
 
 	var scr_bg := ColorRect.new()
-	scr_bg.color = Color(0.03, 0.05, 0.03)  # 어두운 인광 화면 바탕
+	scr_bg.color = Color(0.03, 0.05, 0.03)
 	scr_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_screen.add_child(scr_bg)
 
@@ -83,12 +75,11 @@ func _build_screen() -> void:
 	os.name = "ScreenOS"
 	os.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_screen.add_child(os)
-	os.add_child(_make_informant(Vector2(20, 20), Vector2(340, 300)))
-	os.add_child(_make_editor(Vector2(376, 20), Vector2(430, 500)))
+	os.add_child(_make_informant(Vector2(20, 20), Vector2(340, 320)))
+	os.add_child(_make_editor(Vector2(376, 20), Vector2(430, 540)))
 	os.add_child(_make_comments(Vector2(822, 20), Vector2(310, 400)))
-	os.add_child(_make_gauge(Vector2(20, 336), Vector2(340, 292)))
+	os.add_child(_make_gauge(Vector2(20, 356), Vector2(340, 272)))
 
-	# CRT 후처리: 내용 → BackBufferCopy(Viewport) → CRT ColorRect(입력 통과).
 	var bbc := BackBufferCopy.new()
 	bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
 	_screen.add_child(bbc)
@@ -117,53 +108,54 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 	vb.add_child(t)
 	vb.add_child(HSeparator.new())
 	panel.set_meta("body", vb)
-	return panel  # 반환은 panel; 본문 VBox 는 meta 로 접근
+	return panel
 
 func _body_of(panel: Node) -> VBoxContainer:
 	return panel.get_meta("body") as VBoxContainer
 
+# 정보원: 입수 정보(전부 진실). 유리/불리 태그는 노출하지 않음 — 판단은 플레이어 몫.
 func _make_informant(pos: Vector2, size: Vector2) -> Control:
-	var panel := _window(pos, size, "정보원 — 입수 정보(전부 진실)")
+	var panel := _window(pos, size, "정보원 — 입수 정보")
 	var vb := _body_of(panel)
 	var facts: Dictionary = _tm.content.get("facts", {})
 	for fid in facts:
 		var f: Dictionary = facts[fid]
 		var head := Label.new()
-		head.text = "[%s] %s" % [fid, str(f.get("title", ""))]
+		head.text = "· %s" % str(f.get("title", ""))
 		head.add_theme_color_override("font_color", Color(0.6, 0.9, 0.7))
 		vb.add_child(head)
 		for frag in f.get("fragments", []):
 			var l := Label.new()
-			l.text = "  · (%s) %s" % [str(frag.get("tag", "")), str(frag.get("text", ""))]
+			l.text = "   %s" % str(frag.get("text", ""))
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			vb.add_child(l)
 	return panel
 
+# 원고 작성: 각 문장 블록을 넣을지 말지 토글. 필수 없음. 전부 빼면 미보도.
 func _make_editor(pos: Vector2, size: Vector2) -> Control:
-	var panel := _window(pos, size, "원고 작성")
+	var panel := _window(pos, size, "원고 작성 — 실을 문장 선택")
 	var vb := _body_of(panel)
+	var hint := Label.new()
+	hint.text = "실을 문장에 체크. 무엇을 넣고 빼느냐로 기사가 정해집니다."
+	hint.modulate = Color(0.7, 0.75, 0.7)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(hint)
 
-	vb.add_child(_label("프레임"))
-	_frame_group = _radio_row(vb, FRAMES, 2)  # 기본 찬성각
-	vb.add_child(_label("톤"))
-	_tone_group = _radio_row(vb, TONES, 0)     # 기본 자극
-	vb.add_child(_label("채널"))
-	_channel_group = _radio_row(vb, CHANNELS, 1)  # 기본 sns
-
-	_exagg_check = CheckBox.new()
-	_exagg_check.text = "과장 헤드라인"
-	vb.add_child(_exagg_check)
-
-	vb.add_child(_label("누락(불리 조각 빼기)"))
-	_omit_checks.clear()
-	var facts: Dictionary = _tm.content.get("facts", {})
-	for fid in facts:
-		for frag in facts[fid].get("fragments", []):
-			if str(frag.get("tag", "")) == "불리":
-				var cb := CheckBox.new()
-				cb.text = "누락: " + str(frag.get("text", ""))
-				vb.add_child(cb)
-				_omit_checks.append(cb)
+	_block_checks.clear()
+	var last_fact := ""
+	for b in _tm.get_blocks():
+		if b["fact"] != last_fact:
+			last_fact = b["fact"]
+			var facts: Dictionary = _tm.content.get("facts", {})
+			var fh := Label.new()
+			fh.text = "[%s]" % str(facts.get(last_fact, {}).get("title", last_fact))
+			fh.add_theme_color_override("font_color", Color(0.55, 0.8, 0.95))
+			vb.add_child(fh)
+		var cb := CheckBox.new()
+		cb.text = str(b["text"])
+		cb.button_pressed = true  # 기본 전부 포함(정직 기준선)
+		vb.add_child(cb)
+		_block_checks.append({"cb": cb, "id": str(b["id"])})
 
 	var pub := Button.new()
 	pub.text = "발행"
@@ -173,6 +165,7 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 
 	_status_label = Label.new()
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.5))
+	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(_status_label)
 	return panel
 
@@ -189,7 +182,7 @@ func _make_gauge(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "여론 게이지 (거시·부정확)")
 	var vb := _body_of(panel)
 	var dial := Control.new()
-	dial.custom_minimum_size = Vector2(0, 200)
+	dial.custom_minimum_size = Vector2(0, 190)
 	vb.add_child(dial)
 	var tex := _res(GAUGE_TEX)
 	if tex != null:
@@ -199,75 +192,47 @@ func _make_gauge(pos: Vector2, size: Vector2) -> Control:
 		tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		dial.add_child(tr)
 	_needle = Line2D.new()
-	_needle.points = PackedVector2Array([Vector2(0, 0), Vector2(0, -90)])
+	_needle.points = PackedVector2Array([Vector2(0, 0), Vector2(0, -85)])
 	_needle.width = 4.0
 	_needle.default_color = Color(1.0, 0.5, 0.2)
-	_needle.position = Vector2(160, 190)
+	_needle.position = Vector2(160, 180)
 	dial.add_child(_needle)
 	_set_needle(0.5)
 	return panel
 
 func _set_needle(macro: float) -> void:
-	# 0.5=수직, 0=좌 -60°, 1=우 +60°.
 	if _needle != null:
-		_needle.rotation = deg_to_rad((macro - 0.5) * 120.0)
+		_needle.rotation = deg_to_rad((macro - 0.5) * 120.0)  # 0.5=수직, 우=찬성, 좌=반대
 
 # ---------- 발행 ----------
 func _on_publish() -> void:
-	var omitted := 0
-	for cb in _omit_checks:
-		if cb.button_pressed:
-			omitted += 1
-	var choices := {
-		"frame": _selected(_frame_group, FRAMES, "찬성각"),
-		"tone": _selected(_tone_group, TONES, "자극"),
-		"channel": _selected(_channel_group, CHANNELS, "sns"),
-		"omitted_unfavorable": omitted,
-		"reorder": false,
-		"exaggerate": _exagg_check.button_pressed,
-	}
-	var result := _tm.publish(choices)
+	var included: Array = []
+	for entry in _block_checks:
+		if (entry["cb"] as CheckBox).button_pressed:
+			included.append(entry["id"])
+	var result := _tm.publish({"included_ids": included})
 	_render_comments(result["comments"])
 	var snap: Dictionary = result["snapshot"]
 	_set_needle(float(snap["tvMacro"]))
 	var swing: float = float(snap["xs"]["sns_swing"])
-	_status_label.text = "발행 완료 (턴 %d) · δ=%.2f · 부동층 %d%%%s" % [
-		int(snap["turn"]), float(result["distortion"]), int(round(swing * 100.0)),
-		"  ★목표 달성!" if bool(result["won"]) else "",
+	var reported: Array = result["reported_facts"]
+	var report_txt: String = "미보도" if reported.is_empty() else "보도 %d건" % reported.size()
+	_status_label.text = "턴 %d · %s · 논조 %s(δ=%.2f) · 부동층 %d%%%s" % [
+		int(snap["turn"]), report_txt, str(result["frame_label"]), float(result["distortion"]),
+		int(round(swing * 100.0)), "  ★목표 달성!" if bool(result["won"]) else "",
 	]
 
 func _render_comments(comments: Array) -> void:
 	for c in _comments_box.get_children():
 		c.queue_free()
 	if comments.is_empty():
+		var none := Label.new()
+		none.text = "…반응이 뜸하다."
+		none.modulate = Color(0.6, 0.6, 0.6)
+		_comments_box.add_child(none)
 		return
 	for c in comments:
 		var l := Label.new()
 		l.text = "[%s] %s" % [str(c.get("seg", "")), str(c.get("text", ""))]
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_comments_box.add_child(l)
-
-# ---------- 위젯 헬퍼 ----------
-func _label(t: String) -> Label:
-	var l := Label.new()
-	l.text = t
-	l.add_theme_color_override("font_color", Color(0.6, 0.85, 0.7))
-	return l
-
-func _radio_row(parent: VBoxContainer, options: Array, default_idx: int) -> ButtonGroup:
-	var row := HBoxContainer.new()
-	var group := ButtonGroup.new()
-	for i in options.size():
-		var b := Button.new()
-		b.text = str(options[i])
-		b.toggle_mode = true
-		b.button_group = group
-		if i == default_idx:
-			b.button_pressed = true
-		row.add_child(b)
-	parent.add_child(row)
-	return group
-
-func _selected(group: ButtonGroup, options: Array, fallback: String) -> String:
-	var b := group.get_pressed_button()
-	return b.text if b != null else fallback
