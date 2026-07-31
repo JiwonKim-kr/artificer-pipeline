@@ -65,6 +65,15 @@ def _have_ffmpeg() -> bool:
     return shutil.which(os.environ.get("FFMPEG_BIN", "ffmpeg")) is not None
 
 
+def _have_scenario_keys() -> bool:
+    """실제 Scenario 키가 .env/환경에 있는지 (라이브 검증 가드용)."""
+    try:
+        env_mod.require(["SCENARIO_API_KEY", "SCENARIO_API_SECRET"])
+        return True
+    except env_mod.MissingKeysError:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # stdlib PNG 생성기 — 구현은 pipeline/scripts/placeholder_gen.py 로 일원화했다.
 # (예전에는 이 파일이 zlib/struct 로 직접 PNG 를 썼다. 동일 로직이 두 곳에
@@ -133,6 +142,12 @@ def section_env_config() -> None:
 # ---------------------------------------------------------------------------
 def section_scenario_client() -> None:
     print("\n[2] scenario_client — 키 부재/ dry-run / 엔드포인트 (라이브 호출 없음)")
+
+    # 실 키 감지 → 없으면 라이브 생성 검증을 명시적으로 SKIP (아래는 dry-run 계약만).
+    if _have_scenario_keys():
+        print("  [i] 실 Scenario 키 감지 — 라이브 API 호출은 비용/불안정으로 CI 기본 미실행")
+    else:
+        print("  [SKIP] Scenario 키 미발급 — 라이브 생성 검증 생략 (아래 dry-run 계약만 검증)")
 
     # 엔드포인트 상수 (단일 진실 공급원)
     check("BASE 기본값", sc.Api.base() == "https://api.cloud.scenario.com/v1")

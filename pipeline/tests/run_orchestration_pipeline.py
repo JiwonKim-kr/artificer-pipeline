@@ -105,9 +105,14 @@ def section_verify_repo() -> None:
     check("결과 '전체 통과' 출력", "전체 통과" in r.stdout)
     check("게이트 #3 PASS", "[PASS] 게이트 #3" in r.stdout)
     check("게이트 #4 PASS", "[PASS] 게이트 #4" in r.stdout)
-    # canon 미초기화 → 게이트 5 SKIP + Claude 몫 안내
-    check("게이트 #5 SKIP (canon 미초기화)", "[SKIP] 게이트 #5" in r.stdout)
-    check("게이트 #5 의미 검사=Claude 안내", "Claude" in r.stdout)
+    # 게이트 5 는 저장소의 canon 상태에 따라 SKIP(미초기화) 또는 PASS(정합)다.
+    # 테스트가 canon 유무를 하드코딩 가정하면 안 된다 — 게임 콘텐츠가 canon 을
+    # 채우면 PASS, 파이프라인 정본만 있으면 SKIP. 어느 쪽이든 FAIL 이 아니어야 한다.
+    g5_skip = "[SKIP] 게이트 #5" in r.stdout
+    g5_pass = "[PASS] 게이트 #5" in r.stdout
+    check("게이트 #5 통과 (SKIP 또는 PASS, FAIL 아님)", g5_skip or g5_pass)
+    if g5_skip:
+        check("게이트 #5 SKIP 시 의미 검사=Claude 안내", "Claude" in r.stdout)
     if _have_godot():
         check("게이트 #1 PASS (임포트)", "[PASS] 게이트 #1" in r.stdout)
         check("게이트 #2 PASS (스모크)", "[PASS] 게이트 #2" in r.stdout)
