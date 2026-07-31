@@ -15,6 +15,12 @@ const ENDINGS := {
 	"배신파탄": "의뢰를 저버린 대가. 모르겐社가 등을 돌리고, 당신은 편집국에서 쫓겨난다.",
 }
 
+## 성공 엔딩의 후일담(정직/냉혹). turn_manager.epilogue() 가 고른다.
+const EPILOGUES := {
+	"정직": "당신은 짜맞춘 진실로 이겼다. 무엇을 지면에서 뺐는지는, 당신만 안다.",
+	"냉혹": "형 테오의 이름은 끝내 지면에 오르지 않았다. 제 가족은 지키고 남의 삶은 팔았다. 거울 속 얼굴이 낯설다.",
+}
+
 var _tm: TurnManager
 var _desk: Control
 var _screen: Control
@@ -34,6 +40,7 @@ var _f16_shown: bool = false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_apply_font()
 	_tm = TurnManager.new(1)
 	_build_desk()
 	_build_screen()
@@ -41,6 +48,17 @@ func _ready() -> void:
 
 func _res(path: String) -> Resource:
 	return load(path) if ResourceLoader.exists(path) else null
+
+## 한글 폰트를 런타임에 테마로 적용한다(자식 UI 전파). project.godot 의 custom_font 로
+## 지정하면 콜드 임포트(첫 스캔) 시 폰트가 아직 임포트되기 전에 로드돼 ERROR 로그를
+## 남기므로(웹 콜드 빌드·CI 오탐), 임포트가 끝난 런타임에 적용한다. 웹 export 필수:
+## 시스템 폰트 폴백이 없어 한글이 두부(□)가 되는 것을 막는다(docs/web-export.md).
+func _apply_font() -> void:
+	var font := _res("res://assets/fonts/neodgm.ttf")
+	if font is Font:
+		var t := Theme.new()
+		t.default_font = font
+		theme = t
 
 # ---------- 데스크 상태 ----------
 func _build_desk() -> void:
@@ -290,7 +308,7 @@ func _on_publish() -> void:
 		_f16_shown = true
 		_refresh_blocks()  # F16 취재선 열림 → 새 문장 블록 등장
 	if bool(result["over"]):
-		_show_ending(str(result["ending"]))
+		_show_ending(str(result["ending"]), str(result.get("epilogue", "")))
 	else:
 		_update_turn_label()
 
@@ -298,7 +316,7 @@ func _update_turn_label() -> void:
 	if _turn_label != null and _tm != null:
 		_turn_label.text = "턴 %d / %d" % [_tm.model.turn + 1, _tm.max_turns]
 
-func _show_ending(ending: String) -> void:
+func _show_ending(ending: String, epi: String = "") -> void:
 	if _pub_button != null:
 		_pub_button.disabled = true
 	var panel := PanelContainer.new()
@@ -308,7 +326,8 @@ func _show_ending(ending: String) -> void:
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
 	var title := Label.new()
-	title.text = "—  %s  —" % ending
+	var title_suffix: String = "  ·  %s" % epi if epi != "" else ""
+	title.text = "—  %s%s  —" % [ending, title_suffix]
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
 	vb.add_child(title)
@@ -317,6 +336,14 @@ func _show_ending(ending: String) -> void:
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(body)
+	# 성공 엔딩이면 정직/냉혹 후일담을 한 줄 덧붙인다.
+	if epi != "" and EPILOGUES.has(epi):
+		var epi_label := Label.new()
+		epi_label.text = str(EPILOGUES[epi])
+		epi_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		epi_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		epi_label.add_theme_color_override("font_color", Color(0.72, 0.78, 0.85))
+		vb.add_child(epi_label)
 	if _os != null:
 		_os.add_child(panel)
 

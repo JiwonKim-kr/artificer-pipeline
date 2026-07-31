@@ -26,6 +26,7 @@ var tuning: Dictionary
 var max_turns: int = 8
 var pressure: int = 0  # 반대 스탠스(반대각 기사) 누적 카운터
 var theo_discovered: bool = false  # F15(형 테오) 책상 발견 여부
+var theo_reported: bool = false    # 발견한 형 테오(F15)를 실제로 지면에 실었는가 (후일담 분기)
 var f16_unlocked: bool = false     # F16 취재선 개폐 (F7 반대각 보도 시 열림)
 
 func _init(seed: int = 1) -> void:
@@ -47,6 +48,14 @@ func check_ending() -> String:
 	if model.turn >= max_turns:
 		return "실패"
 	return ""
+
+## 성공 엔딩의 후일담 분기. 형 테오(F15)를 발견하고도 지면에서 뺐다면 "냉혹"
+## (제 가족은 지키며 여론을 조작해 이긴 것). 그 외(무지·정직 보도)는 "정직".
+## 요나스 반전(F14) 축은 콘텐츠에 F14 가 추가되면 여기에 합류한다.
+func epilogue() -> String:
+	if theo_discovered and not theo_reported:
+		return "냉혹"
+	return "정직"
 
 ## 현재 압박 단계의 암시 문구(수치 비표시). 없으면 "".
 func pressure_hint() -> String:
@@ -127,6 +136,9 @@ func publish(choices: Dictionary) -> Dictionary:
 	if frame_label == "반대각":
 		pressure += 1  # 반대 스탠스 = 의뢰인 외압 누적
 
+	if reported.has("F15"):
+		theo_reported = true  # 발견한 형을 실제로 실었다 → 후일담 정직
+
 	# F16 분기: F7 을 반대각으로 보도하면 취재선이 열리고, 찬성/중립으로 보도하면 닫힌다(흔적).
 	var branch_hint: String = ""
 	if reported.has("F7"):
@@ -153,6 +165,7 @@ func publish(choices: Dictionary) -> Dictionary:
 		"f16_unlocked": f16_unlocked,
 		"branch_hint": branch_hint,
 		"ending": ending,
+		"epilogue": epilogue() if ending == "성공" else "",
 		"over": ending != "",
 	}
 

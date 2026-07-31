@@ -139,6 +139,31 @@ func _initialize() -> void:
 	else:
 		print("[PASS] 닫힌 분기: F7 찬성각 → 흔적 노출, F16 잠김 유지")
 
+	# 8) 후일담: 형(F15) 발견 후 은폐 → 냉혹 / 보도·미발견 → 정직
+	var tme := TurnManager.new(1)
+	var epi_ok := true
+	if tme.epilogue() != "정직":
+		print("[FAIL] 기본(미발견) 후일담이 정직 아님: %s" % tme.epilogue()); failures += 1; epi_ok = false
+	tme.discover_theo()
+	if tme.epilogue() != "냉혹":
+		print("[FAIL] 형 발견 후 은폐인데 냉혹 아님: %s" % tme.epilogue()); failures += 1; epi_ok = false
+	tme.theo_reported = true
+	if tme.epilogue() != "정직":
+		print("[FAIL] 형 보도했는데 정직 아님: %s" % tme.epilogue()); failures += 1; epi_ok = false
+	if epi_ok:
+		print("[PASS] 후일담: 발견+은폐→냉혹 / 보도·미발견→정직")
+	# epilogue 는 성공 엔딩에만 실린다(첫 턴은 미종료 → "")
+	var tmf := TurnManager.new(1)
+	var fav_all := []
+	for b in tmf.get_blocks():
+		if str(b["tag"]) == "유리":
+			fav_all.append(b["id"])
+	var rff := tmf.publish({"included_ids": fav_all})
+	if str(rff["ending"]) != "성공" and str(rff.get("epilogue", "")) != "":
+		print("[FAIL] 비성공인데 epilogue 채워짐: %s" % str(rff["epilogue"])); failures += 1
+	else:
+		print("[PASS] epilogue 는 성공 엔딩에만 실림")
+
 	if failures == 0:
 		print("TURN_RESULT: PASS")
 		quit(0)
