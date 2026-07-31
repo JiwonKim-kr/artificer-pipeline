@@ -42,6 +42,7 @@ SCRIPTS = TESTS_DIR.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(TESTS_DIR / "fixtures" / "sample_game"))
 import elevenlabs_client as el  # noqa: E402
+import env_config as env_mod  # noqa: E402
 import se_attach as attach_mod  # noqa: E402
 import se_jsfxr as jsfxr_mod  # noqa: E402
 import sample_game  # noqa: E402  (검증 대상 게임에 무관한 테스트 픽스처)
@@ -70,6 +71,15 @@ def _have_ffmpeg() -> bool:
 
 def _have_jsfxr() -> bool:
     return not jsfxr_mod.check_runtime()
+
+
+def _have_elevenlabs_keys() -> bool:
+    """실제 ElevenLabs 키가 .env/환경에 있는지 (라이브 검증 가드용)."""
+    try:
+        env_mod.require(["ELEVENLABS_API_KEY"])
+        return True
+    except env_mod.MissingKeysError:
+        return False
 
 
 def _sha256(path: Path) -> str:
@@ -260,6 +270,12 @@ def section_se_post() -> None:
 # ---------------------------------------------------------------------------
 def section_elevenlabs() -> None:
     print("\n[3] elevenlabs_client — 키 부재 / dry-run / 엔드포인트 (라이브 호출 없음)")
+
+    # 실 키 감지 → 없으면 라이브 생성 검증을 명시적으로 SKIP (아래는 dry-run 계약만).
+    if _have_elevenlabs_keys():
+        print("  [i] 실 ElevenLabs 키 감지 — 라이브 API 호출은 비용/불안정으로 CI 기본 미실행")
+    else:
+        print("  [SKIP] ElevenLabs 키 미발급 — 라이브 생성 검증 생략 (아래 dry-run 계약만 검증)")
 
     # 엔드포인트 상수 (단일 진실 공급원)
     check("BASE 기본값", el.Api.base() == "https://api.elevenlabs.io/v1")

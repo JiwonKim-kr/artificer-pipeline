@@ -11,7 +11,7 @@
 - UI 아트: `assets/art/ui/<화면>/<요소>.png`
 - 효과음: `assets/audio/se/<이벤트>.ogg` 예: `player_jump.ogg`, `ui_confirm.ogg`
 - 플레이스홀더: `PLACEHOLDER_` 접두사 필수. 예: `PLACEHOLDER_slime_idle.png`
-- 셰이더: `src/ui/shaders/<이름>.gdshader` (snake_case). ShaderMaterial 리소스는 `<이름>_material.tres`.
+- 셰이더: `src/ui/shaders/<이름>.gdshader` (snake_case). 예: `crt_screen.gdshader`. ShaderMaterial 리소스는 `<이름>_material.tres`
 
 ## 매니페스트 ID 규칙
 

@@ -1,0 +1,10 @@
+{
+  "_meta": "게임 계층 튜닝값. 문장 블록 취사 → 기울기(frameValue)·왜곡(δ) 매핑. 모델 config와 분리. spec: docs/specs/turn_loop_vertical_slice.md",
+  "w_omit": 0.34,
+  "_w_omit": "은폐한 불리 사실 1개당 발각 리스크 δ 증가폭.",
+  "k_lean": 0.1,
+  "_k_lean": "기울기 계수. frameValue = clamp(0.5 + k_lean*lean, 0.2, 0.8). lean = 유리노출 + 불리은폐 - 불리노출.",
+  "tone": "자극",
+  "channel": "sns",
+  "_tone_channel": "슬라이스 단순화로 고정(레버 미노출). Phase C에서 레버로 복원."
+}
