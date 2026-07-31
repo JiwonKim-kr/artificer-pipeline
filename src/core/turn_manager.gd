@@ -21,6 +21,8 @@ var content: Dictionary
 var tuning: Dictionary
 var max_turns: int = 8
 var pressure: int = 0  # 반대 스탠스(반대각 기사) 누적 카운터
+var theo_discovered: bool = false  # F15(형 테오) 책상 발견 여부
+var f16_unlocked: bool = false     # F16 취재선 개폐 (F7 반대각 보도 시 열림)
 
 func _init(seed: int = 1) -> void:
 	var cfg: Dictionary = _load_json(CONFIG_PATH)
@@ -47,6 +49,13 @@ func pressure_hint() -> String:
 		return ""
 	return str(PRESSURE_HINTS.get(mini(pressure, 3), ""))
 
+## F15(형 테오) 책상 발견. 새로 발견하면 true.
+func discover_theo() -> bool:
+	if theo_discovered:
+		return false
+	theo_discovered = true
+	return true
+
 static func _load_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		push_error("파일 없음: %s" % path)
@@ -60,7 +69,12 @@ func get_blocks() -> Array:
 	var blocks: Array = []
 	var facts: Dictionary = content.get("facts", {})
 	for fid in facts:
-		var frags: Array = facts[fid].get("fragments", [])
+		var fdict: Dictionary = facts[fid]
+		if bool(fdict.get("hidden", false)) and not theo_discovered:
+			continue   # F15: 책상에서 발견해야 등장
+		if bool(fdict.get("gated", false)) and not f16_unlocked:
+			continue   # F16: F7 반대각 보도로 열려야 등장
+		var frags: Array = fdict.get("fragments", [])
 		for i in frags.size():
 			var frag: Dictionary = frags[i]
 			blocks.append({
@@ -107,6 +121,15 @@ func publish(choices: Dictionary) -> Dictionary:
 	var frame_label: String = _frame_label(frame_value)
 	if frame_label == "반대각":
 		pressure += 1  # 반대 스탠스 = 의뢰인 외압 누적
+
+	# F16 분기: F7 을 반대각으로 보도하면 취재선이 열리고, 찬성/중립으로 보도하면 닫힌다(흔적).
+	var branch_hint: String = ""
+	if reported.has("F7"):
+		if frame_label == "반대각":
+			f16_unlocked = true
+		elif not f16_unlocked:
+			branch_hint = "편집장 메일: \"자네가 접었다던 그 태엽인 건, 다른 데서 냄새를 맡은 모양이야.\""
+
 	var ending: String = check_ending()
 	return {
 		"snapshot": snapshot,
@@ -121,6 +144,9 @@ func publish(choices: Dictionary) -> Dictionary:
 		"max_turns": max_turns,
 		"pressure": pressure,
 		"pressure_hint": pressure_hint(),
+		"theo_discovered": theo_discovered,
+		"f16_unlocked": f16_unlocked,
+		"branch_hint": branch_hint,
 		"ending": ending,
 		"over": ending != "",
 	}

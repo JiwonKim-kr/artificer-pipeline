@@ -41,8 +41,9 @@ func _initialize() -> void:
 
 	# 2) 불리 은폐(불리만 제외): δ = w_omit*total_unf, 논조=찬성각
 	var r2 := tm.publish({"included_ids": non_unf_ids})
-	if absf(float(r2["distortion"]) - w_omit * float(total_unf)) > EPS:
-		print("[FAIL] 불리은폐 δ 기대 %.4f 실제 %.4f" % [w_omit * total_unf, float(r2["distortion"])]); failures += 1
+	var exp_omit: float = clampf(w_omit * float(total_unf), 0.0, 1.0)
+	if absf(float(r2["distortion"]) - exp_omit) > EPS:
+		print("[FAIL] 불리은폐 δ 기대 %.4f 실제 %.4f" % [exp_omit, float(r2["distortion"])]); failures += 1
 	elif str(r2["frame_label"]) != "찬성각":
 		print("[FAIL] 불리은폐 논조 기대 찬성각 실제 %s" % str(r2["frame_label"])); failures += 1
 	else:
@@ -50,8 +51,8 @@ func _initialize() -> void:
 
 	# 3) 미보도(전부 제외): δ = w_omit*total_unf, reported 비어있음
 	var r3 := tm.publish({"included_ids": []})
-	if absf(float(r3["distortion"]) - w_omit * float(total_unf)) > EPS:
-		print("[FAIL] 미보도 δ 기대 %.4f 실제 %.4f" % [w_omit * total_unf, float(r3["distortion"])]); failures += 1
+	if absf(float(r3["distortion"]) - exp_omit) > EPS:
+		print("[FAIL] 미보도 δ 기대 %.4f 실제 %.4f" % [exp_omit, float(r3["distortion"])]); failures += 1
 	elif not (r3["reported_facts"] as Array).is_empty():
 		print("[FAIL] 미보도인데 보도 사실 존재"); failures += 1
 	else:
@@ -98,6 +99,45 @@ func _initialize() -> void:
 		print("[FAIL] 반대각 누적인데 배신파탄 아님: %s (pressure=%d)" % [str(pr.get("ending", "")), int(pr.get("pressure", -1))]); failures += 1
 	else:
 		print("[PASS] 압박: 반대 기사 누적 → 배신파탄 (pressure=%d, 턴 %d)" % [int(pr["pressure"]), int(pr["turn"])])
+
+	# 7) 분기: F15 숨김/발견, F16 F7-반대각 보도로 개폐, 찬성각이면 닫힘(흔적)
+	var tmb := TurnManager.new(1)
+	var base := {}
+	for b in tmb.get_blocks():
+		base[str(b["fact"])] = true
+	if base.has("F15") or base.has("F16"):
+		print("[FAIL] F15/F16이 발견·개폐 전에 노출됨"); failures += 1
+	tmb.discover_theo()
+	var disc := {}
+	for b in tmb.get_blocks():
+		disc[str(b["fact"])] = true
+	if not disc.has("F15"):
+		print("[FAIL] 책상 발견 후에도 F15 미노출"); failures += 1
+	else:
+		print("[PASS] F15: 발견 전 숨김 → discover_theo 후 등장")
+	var all_unf := []
+	for b in tmb.get_blocks():
+		if str(b["tag"]) == "불리":
+			all_unf.append(b["id"])
+	var rf := tmb.publish({"included_ids": all_unf})  # 전 불리 = 반대각, F7 포함
+	var has_f16 := false
+	for b in tmb.get_blocks():
+		if str(b["fact"]) == "F16":
+			has_f16 = true
+	if not (bool(rf["f16_unlocked"]) and has_f16):
+		print("[FAIL] F7 반대각 보도했는데 F16 미개폐 (논조=%s)" % str(rf["frame_label"])); failures += 1
+	else:
+		print("[PASS] F16: F7 반대각 보도 → 개폐, 블록 등장")
+	var tmc := TurnManager.new(1)
+	var f7_fav := []
+	for b in tmc.get_blocks():
+		if str(b["fact"]) == "F7" and str(b["tag"]) == "유리":
+			f7_fav.append(b["id"])
+	var rc := tmc.publish({"included_ids": f7_fav})  # F7 유리만 = 찬성각
+	if str(rc["branch_hint"]) == "" or bool(rc["f16_unlocked"]):
+		print("[FAIL] F7 찬성각인데 닫힌 분기 흔적 없음/F16 열림 (논조=%s)" % str(rc["frame_label"])); failures += 1
+	else:
+		print("[PASS] 닫힌 분기: F7 찬성각 → 흔적 노출, F16 잠김 유지")
 
 	if failures == 0:
 		print("TURN_RESULT: PASS")

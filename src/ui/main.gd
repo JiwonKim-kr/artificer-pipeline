@@ -26,6 +26,11 @@ var _status_label: Label
 var _turn_label: Label
 var _pub_button: Button
 var _pressure_label: Label
+var _branch_label: Label
+var _blocks_box: VBoxContainer
+var _desk_search_btn: Button
+var _desk_note: Label
+var _f16_shown: bool = false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -58,17 +63,38 @@ func _build_desk() -> void:
 		_desk.add_child(cr)
 	_desk.add_child(bg)
 
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_desk.add_child(box)
 	var btn := Button.new()
 	btn.name = "MonitorButton"
 	btn.text = "모니터 켜기"
-	btn.custom_minimum_size = Vector2(220, 64)
-	btn.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	btn.custom_minimum_size = Vector2(220, 56)
 	btn.pressed.connect(_enter_screen)
-	_desk.add_child(btn)
+	box.add_child(btn)
+	_desk_search_btn = Button.new()
+	_desk_search_btn.text = "책상 뒤지기"
+	_desk_search_btn.custom_minimum_size = Vector2(220, 44)
+	_desk_search_btn.pressed.connect(_search_desk)
+	box.add_child(_desk_search_btn)
+	_desk_note = Label.new()
+	_desk_note.add_theme_color_override("font_color", Color(0.7, 0.85, 0.7))
+	_desk_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_desk_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_desk_note)
 
 func _enter_screen() -> void:
 	_desk.visible = false
 	_screen.visible = true
+
+func _search_desk() -> void:
+	if _tm.discover_theo():
+		_refresh_blocks()
+		_desk_note.text = "책상 CRT 수신함에서 형 테오의 흔적을 찾았다. (원고에 추가됨)"
+		if _desk_search_btn != null:
+			_desk_search_btn.disabled = true
+	else:
+		_desk_note.text = "책상엔 더 뒤질 게 없다."
 
 # ---------- 스크린 상태 (CRT OS) ----------
 func _build_screen() -> void:
@@ -157,21 +183,9 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(hint)
 
-	_block_checks.clear()
-	var last_fact := ""
-	for b in _tm.get_blocks():
-		if b["fact"] != last_fact:
-			last_fact = b["fact"]
-			var facts: Dictionary = _tm.content.get("facts", {})
-			var fh := Label.new()
-			fh.text = "[%s]" % str(facts.get(last_fact, {}).get("title", last_fact))
-			fh.add_theme_color_override("font_color", Color(0.55, 0.8, 0.95))
-			vb.add_child(fh)
-		var cb := CheckBox.new()
-		cb.text = str(b["text"])
-		cb.button_pressed = true  # 기본 전부 포함(정직 기준선)
-		vb.add_child(cb)
-		_block_checks.append({"cb": cb, "id": str(b["id"])})
+	_blocks_box = VBoxContainer.new()
+	vb.add_child(_blocks_box)
+	_refresh_blocks()
 
 	var pub := Button.new()
 	pub.text = "발행"
@@ -188,7 +202,34 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	_pressure_label.add_theme_color_override("font_color", Color(0.95, 0.4, 0.35))
 	_pressure_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(_pressure_label)
+	_branch_label = Label.new()
+	_branch_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.55))
+	_branch_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(_branch_label)
 	return panel
+
+## 취사 가능한 문장 블록을 현재 상태(F15 발견·F16 개폐 반영)로 다시 그린다.
+func _refresh_blocks() -> void:
+	if _blocks_box == null:
+		return
+	for c in _blocks_box.get_children():
+		_blocks_box.remove_child(c)
+		c.free()
+	_block_checks.clear()
+	var facts: Dictionary = _tm.content.get("facts", {})
+	var last_fact := ""
+	for b in _tm.get_blocks():
+		if b["fact"] != last_fact:
+			last_fact = str(b["fact"])
+			var fh := Label.new()
+			fh.text = "[%s]" % str((facts.get(last_fact, {}) as Dictionary).get("title", last_fact))
+			fh.add_theme_color_override("font_color", Color(0.55, 0.8, 0.95))
+			_blocks_box.add_child(fh)
+		var cb := CheckBox.new()
+		cb.text = str(b["text"])
+		cb.button_pressed = true
+		_blocks_box.add_child(cb)
+		_block_checks.append({"cb": cb, "id": str(b["id"])})
 
 func _make_comments(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "댓글")
@@ -243,6 +284,11 @@ func _on_publish() -> void:
 	]
 	if _pressure_label != null:
 		_pressure_label.text = str(result["pressure_hint"])
+	if _branch_label != null and str(result["branch_hint"]) != "":
+		_branch_label.text = str(result["branch_hint"])
+	if bool(result["f16_unlocked"]) and not _f16_shown:
+		_f16_shown = true
+		_refresh_blocks()  # F16 취재선 열림 → 새 문장 블록 등장
 	if bool(result["over"]):
 		_show_ending(str(result["ending"]))
 	else:
