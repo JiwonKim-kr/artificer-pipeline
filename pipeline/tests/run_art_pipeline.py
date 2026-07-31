@@ -175,15 +175,12 @@ def section_scenario_client() -> None:
     check("dry-run 표시에 Authorization 마스킹", "****" in disp["headers"]["Authorization"] and "k:s" not in json.dumps(disp))
 
     # CLI: 키 부재 → 종료 코드 3, 스택트레이스 없음
-    # SCENARIO_* 제거된 깨끗한 환경. PYTHONUTF8 은 남긴다 — 없으면 Windows 에서 자식이
-    # 한글 안내를 cp949 로 내보내고 부모(utf-8 디코드)의 리더 스레드가 UnicodeDecodeError 로
-    # 죽어 r.stderr 가 None 이 된다(아래 in 검사에서 TypeError).
-    clean_env = {"PATH": os.environ.get("PATH", ""), "PYTHONUTF8": "1"}
+    clean_env = {"PATH": os.environ.get("PATH", "")}  # SCENARIO_* 제거된 깨끗한 환경
     with tempfile.TemporaryDirectory() as td:
         r = subprocess.run(
             [sys.executable, str(SCRIPTS / "scenario_client.py"),
              "generate", "--model-id", "m1", "--prompt", "x", "--env", str(Path(td) / "none.env")],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", env=clean_env,
+            capture_output=True, text=True, env=clean_env,
         )
         check("키 부재 generate → 종료 코드 3", r.returncode == 3)
         check("키 부재 안내에 .env 형식 포함", "SCENARIO_API_KEY=" in r.stderr)
@@ -195,7 +192,7 @@ def section_scenario_client() -> None:
         r = subprocess.run(
             [sys.executable, str(SCRIPTS / "scenario_client.py"),
              "generate", "--model-id", "m1", "--prompt", "x", "--env", str(envp), "--dry-run"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", env=clean_env,
+            capture_output=True, text=True, env=clean_env,
         )
         check("dry-run generate → 종료 0", r.returncode == 0)
         check("dry-run 출력에 엔드포인트", "/generate/custom/m1" in r.stdout)
@@ -208,7 +205,7 @@ def section_scenario_client() -> None:
             [sys.executable, str(SCRIPTS / "scenario_client.py"),
              "train", "--name", "S", "--type", "flux.2-dev-lora", "--image", str(img),
              "--seed", "1", "--env", str(envp), "--dry-run"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", env=clean_env,
+            capture_output=True, text=True, env=clean_env,
         )
         check("dry-run train → 종료 0", r.returncode == 0)
         check("dry-run train 3건(create/upload/start)", "(3)" in r.stdout and "/train" in r.stdout)

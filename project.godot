@@ -24,21 +24,3 @@ config/features=PackedStringArray("4.6")
 
 gdscript/warnings/untyped_declaration=1
 
-[rendering]
-
-; 웹(HTML5) export 제약: Godot 4.6 의 웹 플랫폼은 Compatibility 렌더러(WebGL 2)만
-; 안정 지원한다. forward_plus(기본값)로 두면 웹 빌드가 성립하지 않으므로 고정한다.
-; 셰이더(CRT 스캔라인·글로우·색수차)도 이 렌더러 기준으로 작성한다. (0-b 실측 근거:
-; docs/web-export.md)
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
-
-[display]
-
-; 1턴 슬라이스 디자인 해상도(16:9) + 스트레치. 배경 3:2는 이후 16:9 재작업(웹 export 정합).
-; spec: docs/specs/turn_loop_vertical_slice.md
-window/size/viewport_width=1152
-window/size/viewport_height=648
-window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
-

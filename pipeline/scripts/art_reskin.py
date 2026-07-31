@@ -72,13 +72,12 @@ def derive_paths(entry: dict) -> tuple[str, str]:
     params = entry.get("params") or {}
     p = Path(file_ref)
     base = p.name
-    # as_posix(): 매니페스트/res:// 경로는 OS 무관 슬래시 고정 (Windows str() 은 역슬래시)
     if base.startswith(PLACEHOLDER_PREFIX):
         placeholder = file_ref
-        real = p.with_name(base[len(PLACEHOLDER_PREFIX):]).as_posix()
+        real = str(p.with_name(base[len(PLACEHOLDER_PREFIX):]))
     else:
         real = file_ref
-        placeholder = p.with_name(PLACEHOLDER_PREFIX + base).as_posix()
+        placeholder = str(p.with_name(PLACEHOLDER_PREFIX + base))
     if params.get("generated_file"):
         real = params["generated_file"]
     return placeholder, real
@@ -224,11 +223,10 @@ def _resolve_ref_path(ref: str, project_dir: Path) -> Path:
 
 
 def _rel_to_project(p: Path, project_dir: Path) -> str:
-    # as_posix(): 씬 경로 비교(exclude_scenes)는 매니페스트의 슬래시 표기와 맞춘다.
     try:
-        return p.resolve().relative_to(project_dir.resolve()).as_posix()
+        return str(p.resolve().relative_to(project_dir.resolve()))
     except ValueError:
-        return p.as_posix()
+        return str(p)
 
 
 def _iter_scene_like_files(project_dir: Path):

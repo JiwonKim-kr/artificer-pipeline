@@ -56,10 +56,7 @@ def check(label: str, condition: bool) -> None:
 
 
 def _run(cmd: list[str], **kw) -> subprocess.CompletedProcess[str]:
-    # encoding 고정: Windows 에서 자식 cp949 출력 ↔ 부모 utf-8 디코드가 어긋나면
-    # 리더 스레드가 죽어 stdout/stderr 가 None 이 된다.
-    return subprocess.run(cmd, capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", **kw)
+    return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
 def _have_godot() -> bool:
@@ -209,8 +206,7 @@ def section_status() -> None:
     with tempfile.TemporaryDirectory() as td:
         envp = Path(td) / "fake.env"
         envp.write_text("SCENARIO_API_KEY=SUPERSECRET_TOKEN_XYZ\n", encoding="utf-8")
-        # PYTHONUTF8 은 남긴다(Windows 에서 자식 cp949 출력 방지).
-        clean_env = {"PATH": os.environ.get("PATH", ""), "PYTHONUTF8": "1"}
+        clean_env = {"PATH": os.environ.get("PATH", "")}
         r = _run([sys.executable, str(SCRIPTS / "status.py"),
                   "--env", str(envp), "--json"], env=clean_env)
         data = json.loads(r.stdout)

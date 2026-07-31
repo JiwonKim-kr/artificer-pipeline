@@ -165,11 +165,10 @@ def check_naming_rules(
     violations: list[Violation] = []
 
     def rel(p: Path) -> str:
-        # as_posix(): 위반 리포트 경로는 OS 무관 슬래시 고정(러너·CI 대조 일관성)
         try:
-            return p.resolve().relative_to(project_dir.resolve()).as_posix()
+            return str(p.resolve().relative_to(project_dir.resolve()))
         except ValueError:
-            return p.as_posix()
+            return str(p)
 
     declared = _manifest_declared_files(project_dir, manifest_path)
 
