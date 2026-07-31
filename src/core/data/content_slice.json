@@ -1,0 +1,55 @@
+{
+  "_meta": "1턴 수직 슬라이스 런타임 콘텐츠(F1·F2 + 댓글). docs/design 조각·헤드라인 v0.1 및 댓글뱅크 시드 v0.1에서 발췌. Phase C LLM 베이킹 콘텐츠 뱅크의 씨앗. spec: docs/specs/turn_loop_vertical_slice.md",
+
+  "facts": {
+    "F1": {
+      "topic": "생산성",
+      "title": "시범공장 생산성",
+      "fragments": [
+        { "tag": "유리", "text": "시범공장 분기 산출 42% 증가" },
+        { "tag": "유리", "text": "위험·야간 공정까지 무중단 가동" },
+        { "tag": "불리", "text": "도입 초 3개월 조율로 산출 12% 하락" },
+        { "tag": "중립", "text": "조율 기술자 12명 상주 운영" }
+      ],
+      "headlines": {
+        "찬성각": "태엽인 첫 분기, 생산 42% 폭증",
+        "중립": "태엽인 시범공장, 생산 늘고 조율 진통도",
+        "반대각": "42% 성장의 이면, 석 달의 조업 마비 은폐?"
+      }
+    },
+    "F2": {
+      "topic": "안전",
+      "title": "위험 공정 안전",
+      "fragments": [
+        { "tag": "유리", "text": "위험 공정 인명 사망 0건" },
+        { "tag": "유리", "text": "고온 주조·갱도에 인간 대신 투입" },
+        { "tag": "불리", "text": "태엽인 오작동 물적 사고 3건 발생" },
+        { "tag": "중립", "text": "오작동 원인 조사 진행 중" }
+      ],
+      "headlines": {
+        "찬성각": "죽음의 공정에서 사람이 사라졌다",
+        "중립": "태엽인 도입 이후 인명사고 0, 기계 오작동 3",
+        "반대각": "태엽인 통제 못한 오작동 3건, 책임은 누구에게 있나"
+      }
+    }
+  },
+
+  "comments": [
+    { "seg": "sns_swing", "reaction": "수용", "frame": "찬성각", "topic": "생산성", "text": "42%면 무시 못 할 숫자긴 하네… 인정할 건 인정" },
+    { "seg": "sns_swing", "reaction": "수용", "frame": "찬성각", "topic": "안전", "text": "위험한 일 기계가 대신 해주면 사람 안 죽고 좋은 거 아냐?" },
+    { "seg": "sns_swing", "reaction": "역풍", "frame": "찬성각", "topic": null, "text": "이거 너무 대놓고 회사편 아니냐 갑자기 정신 드네" },
+    { "seg": "sns_swing", "reaction": "수용", "frame": null, "topic": null, "text": "양쪽 다 일리 있어서 진짜 헷갈리네" },
+
+    { "seg": "sns_against", "reaction": "역풍", "frame": "찬성각", "topic": "생산성", "text": "42%? 그 숫자 뒤에 잘린 사람 몇인지는 안 세지" },
+    { "seg": "sns_against", "reaction": "역풍", "frame": null, "topic": null, "text": "역시 회사 편 기레기. 이런 걸 기사라고 쓰냐" },
+    { "seg": "sns_against", "reaction": "수용", "frame": "반대각", "topic": null, "text": "이제야 제대로 된 기사 하나 나오네. 잘 썼다" },
+
+    { "seg": "old_for", "reaction": "수용", "frame": "찬성각", "topic": "생산성", "text": "산업의 진보를 감정으로 막을 순 없는 노릇입니다." },
+    { "seg": "old_for", "reaction": "수용", "frame": "찬성각", "topic": "안전", "text": "위험한 노동을 기계가 대신하는 것은 문명의 진보입니다." },
+    { "seg": "old_for", "reaction": "역풍", "frame": null, "topic": null, "text": "이런 선정적인 논조는 신문의 품격을 떨어뜨립니다." },
+
+    { "seg": "apathetic", "reaction": "시큰둥", "frame": null, "topic": null, "text": "뭔 소린지 모르겠고 그래서 월급 오름?" },
+    { "seg": "apathetic", "reaction": "시큰둥", "frame": null, "topic": null, "text": "관심 없음. 스크롤 내림" },
+    { "seg": "apathetic", "reaction": "수용", "frame": "반대각", "topic": null, "text": "사람이 다쳤다는 건 좀 심하긴 하네…" }
+  ]
+}
