@@ -1,5 +1,4 @@
 ---
-status: approved
 track: play
 name: turn_loop_vertical_slice
 title: 「태엽 인간」 Phase B — 1턴 수직 슬라이스 (정면 모니터 · 레트로 OS UI · 여론엔진 이식)
@@ -11,6 +10,8 @@ references:
   - docs/design/댓글뱅크_설계_v0.1.md
   - sim/opinion-model/ (설계·검증 오라클 + 이식 대조 기준)
 ---
+
+- **status**: approved
 
 # 목적 (goal)
 정면 고정 시점 책상 화면에서 **모니터 클릭 → 전체화면 전환 + CRT 셰이더 → 레트로 OS 창 UI**로
@@ -155,3 +156,5 @@ export_presets 수정 불필요(src/ 포함). 이전 후 재-export로 pck 포�
 - 발각·평판·압박 3축은 이식하되 슬라이스에서 미소진 → Phase C 검증.
 - topic 정본 불일치(`요나스반전`/`임금`) 정리 = Phase C.
 - (옵션) 데모 임팩트용 2~3턴 확장.
+
+> [review 승인 2026-07-31] 사람 검수 승인.
