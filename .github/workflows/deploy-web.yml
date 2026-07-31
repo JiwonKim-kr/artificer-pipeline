@@ -1,0 +1,98 @@
+# 웹 빌드 → GitHub Pages 배포 (수동 트리거)
+#
+# NAN2026 제출 형태: 링크 접속 → 즉시 플레이 (심사자 입력 0, 특수 헤더 불필요 —
+# 실측 근거 docs/web-export.md: 스레드 미사용 빌드라 COOP/COEP 없이 구동).
+#
+# 왜 수동(workflow_dispatch)인가: 배포는 공개 행위이므로 push 마다 자동으로 갈리지 않고
+# 사람이 Actions 탭에서 브랜치를 골라 실행한다. verify(push/PR)와 분리.
+#
+# 선행 조건 (저장소 설정 — 사람 1회):
+#   1. Settings → Pages → Source: "GitHub Actions"
+#   2. Pages 는 public 저장소(또는 유료 플랜) 필요
+#
+# ⚠️ 첫 실행에서 확인 필요: 템플릿 다운로드(1.17GB, 이후 캐시)와
+#    linux 템플릿 경로(~/.local/share/godot/export_templates/<버전>).
+
+name: deploy-web
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.6.3"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot (cache miss)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot-bin
+          BASE="https://github.com/godotengine/godot-builds/releases/download"
+          ZIP="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fL "${BASE}/${GODOT_VERSION}-stable/${ZIP}" -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d ~/godot-bin
+          mv ~/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot-bin/godot
+          chmod +x ~/godot-bin/godot
+
+      - name: Cache export templates
+        id: cache-templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates
+          key: godot-templates-${{ env.GODOT_VERSION }}-stable
+
+      - name: Download export templates (cache miss, 1.17GB)
+        if: steps.cache-templates.outputs.cache-hit != 'true'
+        run: |
+          BASE="https://github.com/godotengine/godot/releases/download"
+          TPZ="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          curl -fL "${BASE}/${GODOT_VERSION}-stable/${TPZ}" -o /tmp/templates.tpz
+          DEST="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$DEST"
+          unzip -q -o -j /tmp/templates.tpz 'templates/*' -d "$DEST"
+          cat "$DEST/version.txt"
+
+      - name: Export web build
+        run: |
+          export PATH="$HOME/godot-bin:$PATH"
+          godot --version
+          mkdir -p export/web
+          godot --headless --import || true
+          godot --headless --export-release "Web"
+          ls -la export/web/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: export/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -33,6 +33,15 @@ gdscript/warnings/untyped_declaration=1
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 
+[gui]
+
+; 웹 export 에는 시스템 폰트 폴백이 없어 Godot 기본 폰트(한글 미포함)가 그대로 쓰인다
+; → 한글 전면 두부(□). 로컬 에디터는 macOS 시스템 폴백으로 가려져 있던 문제.
+; Neo둥근모(OFL-1.1, 0.62MB)를 기본 폰트로 번들한다 — CRT 터미널 미학과 정합.
+; 픽셀 폰트이므로 안티앨리어싱 off. 실측 기록: docs/web-export.md
+theme/custom_font="res://assets/fonts/neodgm.ttf"
+theme/default_font_antialiasing=0
+
 [display]
 
 ; 1턴 슬라이스 디자인 해상도(16:9) + 스트레치. 배경 3:2는 이후 16:9 재작업(웹 export 정합).
