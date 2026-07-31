@@ -11,12 +11,24 @@ const TUNING_PATH := "res://src/core/lever_tuning.json"
 var model: OpinionModel
 var content: Dictionary
 var tuning: Dictionary
+var max_turns: int = 8
 
 func _init(seed: int = 1) -> void:
 	var cfg: Dictionary = _load_json(CONFIG_PATH)
 	content = _load_json(CONTENT_PATH)
 	tuning = _load_json(TUNING_PATH)
 	model = OpinionModel.new(cfg, seed)
+	max_turns = int((cfg.get("mission", {}) as Dictionary).get("maxTurns", 8))
+
+## 종료 판정: 발각 2회+ → 발각파탄 / 목표 도달 → 성공 / maxTurns 도달 → 실패 / 그 외 진행("").
+func check_ending() -> String:
+	if model.detections.size() >= 2:
+		return "발각파탄"
+	if model.is_won():
+		return "성공"
+	if model.turn >= max_turns:
+		return "실패"
+	return ""
 
 static func _load_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
@@ -76,6 +88,7 @@ func publish(choices: Dictionary) -> Dictionary:
 	}
 	var snapshot: Dictionary = model.step(article)
 	var frame_label: String = _frame_label(frame_value)
+	var ending: String = check_ending()
 	return {
 		"snapshot": snapshot,
 		"comments": _select_comments(frame_label, snapshot),
@@ -85,6 +98,10 @@ func publish(choices: Dictionary) -> Dictionary:
 		"frame_label": frame_label,
 		"reported_facts": reported.keys(),
 		"won": model.is_won(),
+		"turn": model.turn,
+		"max_turns": max_turns,
+		"ending": ending,
+		"over": ending != "",
 	}
 
 static func _frame_label(p: float) -> String:

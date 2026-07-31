@@ -66,6 +66,23 @@ func _initialize() -> void:
 	else:
 		print("[PASS] 불리만 보도: δ=0, 논조=%s" % str(r4["frame_label"]))
 
+	# 5) 다중 턴 → maxTurns 도달 시 종료·엔딩
+	var tm2 := TurnManager.new(1)
+	var all2: Array = []
+	for b in tm2.get_blocks():
+		all2.append(b["id"])
+	var last: Dictionary = {}
+	for _t in tm2.max_turns:
+		last = tm2.publish({"included_ids": all2})
+		if bool(last["over"]):
+			break
+	if last.is_empty() or not bool(last["over"]):
+		print("[FAIL] maxTurns 내 종료 안 됨"); failures += 1
+	elif not (str(last["ending"]) in ["성공", "실패", "발각파탄"]):
+		print("[FAIL] 엔딩 값 이상: %s" % str(last["ending"])); failures += 1
+	else:
+		print("[PASS] 다중 턴 종료: %s (턴 %d/%d)" % [str(last["ending"]), int(last["turn"]), tm2.max_turns])
+
 	if failures == 0:
 		print("TURN_RESULT: PASS")
 		quit(0)

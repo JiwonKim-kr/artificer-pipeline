@@ -8,13 +8,22 @@ const DESK_BG := "res://assets/art/ui/main/PLACEHOLDER_desk_bg.png"
 const GAUGE_TEX := "res://assets/art/ui/gauge/PLACEHOLDER_opinion_needle.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
 
+const ENDINGS := {
+	"성공": "표결일. 부동층이 찬성으로 돌아섰다. 「노동 근대화법」은 통과됐다.",
+	"실패": "표결일. 끝내 여론을 돌리지 못했다. 법안은 보류됐다.",
+	"발각파탄": "당신의 왜곡이 들통났다. 기자 자격을 잃고 편집국을 떠난다.",
+}
+
 var _tm: TurnManager
 var _desk: Control
 var _screen: Control
+var _os: Control
 var _block_checks: Array = []  # [{cb: CheckBox, id: String}]
 var _comments_box: VBoxContainer
 var _needle: Line2D
 var _status_label: Label
+var _turn_label: Label
+var _pub_button: Button
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -75,6 +84,7 @@ func _build_screen() -> void:
 	os.name = "ScreenOS"
 	os.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_screen.add_child(os)
+	_os = os
 	os.add_child(_make_informant(Vector2(20, 20), Vector2(340, 320)))
 	os.add_child(_make_editor(Vector2(376, 20), Vector2(430, 540)))
 	os.add_child(_make_comments(Vector2(822, 20), Vector2(310, 400)))
@@ -135,6 +145,10 @@ func _make_informant(pos: Vector2, size: Vector2) -> Control:
 func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "원고 작성 — 실을 문장 선택")
 	var vb := _body_of(panel)
+	_turn_label = Label.new()
+	_turn_label.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
+	vb.add_child(_turn_label)
+	_update_turn_label()
 	var hint := Label.new()
 	hint.text = "실을 문장에 체크. 무엇을 넣고 빼느냐로 기사가 정해집니다."
 	hint.modulate = Color(0.7, 0.75, 0.7)
@@ -162,6 +176,7 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	pub.custom_minimum_size = Vector2(0, 40)
 	pub.pressed.connect(_on_publish)
 	vb.add_child(pub)
+	_pub_button = pub
 
 	_status_label = Label.new()
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.5))
@@ -217,10 +232,39 @@ func _on_publish() -> void:
 	var swing: float = float(snap["xs"]["sns_swing"])
 	var reported: Array = result["reported_facts"]
 	var report_txt: String = "미보도" if reported.is_empty() else "보도 %d건" % reported.size()
-	_status_label.text = "턴 %d · %s · 논조 %s(δ=%.2f) · 부동층 %d%%%s" % [
-		int(snap["turn"]), report_txt, str(result["frame_label"]), float(result["distortion"]),
-		int(round(swing * 100.0)), "  ★목표 달성!" if bool(result["won"]) else "",
+	_status_label.text = "%s · 논조 %s(δ=%.2f) · 부동층 %d%%" % [
+		report_txt, str(result["frame_label"]), float(result["distortion"]), int(round(swing * 100.0)),
 	]
+	if bool(result["over"]):
+		_show_ending(str(result["ending"]))
+	else:
+		_update_turn_label()
+
+func _update_turn_label() -> void:
+	if _turn_label != null and _tm != null:
+		_turn_label.text = "턴 %d / %d" % [_tm.model.turn + 1, _tm.max_turns]
+
+func _show_ending(ending: String) -> void:
+	if _pub_button != null:
+		_pub_button.disabled = true
+	var panel := PanelContainer.new()
+	panel.name = "EndingOverlay"
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(660, 200)
+	var vb := VBoxContainer.new()
+	panel.add_child(vb)
+	var title := Label.new()
+	title.text = "—  %s  —" % ending
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
+	vb.add_child(title)
+	var body := Label.new()
+	body.text = str(ENDINGS.get(ending, ""))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(body)
+	if _os != null:
+		_os.add_child(panel)
 
 func _render_comments(comments: Array) -> void:
 	for c in _comments_box.get_children():
