@@ -1,0 +1,456 @@
+{
+  "_meta": "수직 슬라이스 런타임 콘텐츠(대표 사실 F1·F2·F7 + 분기 F15 숨김/F16 개폐). 댓글은 content/comment-bank 시드 흡수(찌라시=의심 reaction 은 자생 메커닉 미구현으로 제외). 유리/불리 태그는 내부 계산용(비노출). 선택은 seg+reaction, frame 가점 + 쿨다운 랜덤(반복방어 9.3). spec: docs/specs/turn_loop_vertical_slice.md, phase_c_turn_progression.md",
+  "facts": {
+    "F1": {
+      "topic": "생산성",
+      "title": "시범공장 생산성",
+      "fragments": [
+        {
+          "tag": "유리",
+          "text": "시범공장 분기 산출 42% 증가"
+        },
+        {
+          "tag": "유리",
+          "text": "위험·야간 공정까지 무중단 가동"
+        },
+        {
+          "tag": "불리",
+          "text": "도입 초 3개월 조율로 산출 12% 하락"
+        },
+        {
+          "tag": "중립",
+          "text": "조율 기술자 12명 상주 운영"
+        }
+      ],
+      "headlines": {
+        "찬성각": "태엽인 첫 분기, 생산 42% 폭증",
+        "중립": "태엽인 시범공장, 생산 늘고 조율 진통도",
+        "반대각": "42% 성장의 이면, 석 달의 조업 마비 은폐?"
+      }
+    },
+    "F2": {
+      "topic": "안전",
+      "title": "위험 공정 안전",
+      "fragments": [
+        {
+          "tag": "유리",
+          "text": "위험 공정 인명 사망 0건"
+        },
+        {
+          "tag": "유리",
+          "text": "고온 주조·갱도에 인간 대신 투입"
+        },
+        {
+          "tag": "불리",
+          "text": "태엽인 오작동 물적 사고 3건 발생"
+        },
+        {
+          "tag": "중립",
+          "text": "오작동 원인 조사 진행 중"
+        }
+      ],
+      "headlines": {
+        "찬성각": "죽음의 공정에서 사람이 사라졌다",
+        "중립": "태엽인 도입 이후 인명사고 0, 기계 오작동 3",
+        "반대각": "태엽인 통제 못한 오작동 3건, 책임은 누구에게"
+      }
+    },
+    "F7": {
+      "topic": "인격",
+      "title": "'일곱이' 목격담",
+      "fragments": [
+        {
+          "tag": "유리",
+          "text": "회사는 '정교한 안전 반사 설계'라 설명"
+        },
+        {
+          "tag": "불리",
+          "text": "태엽인이 스스로 '일곱이'라 이름 지음"
+        },
+        {
+          "tag": "불리",
+          "text": "사고 순간 인간 동료를 밀쳐 구함"
+        },
+        {
+          "tag": "중립",
+          "text": "목격자 1인 증언"
+        }
+      ],
+      "headlines": {
+        "찬성각": "완벽한 안전 설계, 유닛 7의 인명 보호",
+        "중립": "이름을 말한 태엽인, 우연인가 자아인가",
+        "반대각": "우리는 도구가 아니다, '일곱이'의 희생"
+      }
+    },
+    "F15": {
+      "topic": "실업",
+      "title": "형 테오 (책상에서 발견)",
+      "hidden": true,
+      "fragments": [
+        {
+          "tag": "불리",
+          "text": "주물공 형 테오, 일 잃고 건강 악화"
+        },
+        {
+          "tag": "불리",
+          "text": "재교육 정원 밖으로 밀려난 가장"
+        },
+        {
+          "tag": "중립",
+          "text": "본인은 신문 노출을 완강히 거부"
+        }
+      ],
+      "headlines": {
+        "찬성각": "",
+        "중립": "한 주물공의 침묵",
+        "반대각": "사라진 일자리, 사라진 인생"
+      }
+    },
+    "F16": {
+      "topic": "인격",
+      "title": "모르겐社의 조용한 폐기",
+      "gated": true,
+      "fragments": [
+        {
+          "tag": "유리",
+          "text": "회사: '결함 유닛의 통상 회수 절차'"
+        },
+        {
+          "tag": "불리",
+          "text": "일곱이 보도 직후 해체 지시 — 입막음 정황"
+        },
+        {
+          "tag": "중립",
+          "text": "해체 사유·기록 비공개"
+        }
+      ],
+      "headlines": {
+        "찬성각": "결함 유닛 회수, 정해진 절차일 뿐",
+        "중립": "논란의 '일곱이', 조용히 해체 수순",
+        "반대각": "말 꺼낸 순간 부쉈다 — 입막음된 태엽인"
+      }
+    }
+  },
+  "comments": [
+    {
+      "id": "swing_accept_comp_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "경쟁",
+      "text": "솔직히 {대상}한테 뒤처지면 우리 다 굶는 거 아님? 이건 해야 할 듯"
+    },
+    {
+      "id": "swing_accept_comp_02",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "경쟁",
+      "text": "노르덴은 벌써 달린다는데 우리만 멈춰있는 거 좀 그렇긴 하다"
+    },
+    {
+      "id": "swing_accept_prod_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "생산성",
+      "text": "{수치}면 무시 못 할 숫자긴 하네… 인정할 건 인정"
+    },
+    {
+      "id": "swing_accept_safe_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "안전",
+      "text": "위험한 일 기계가 대신 해주면 사람 안 죽고 좋은 거 아냐?"
+    },
+    {
+      "id": "swing_accept_job_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "신직종",
+      "text": "재교육 받으면 오히려 더 번다는 사람도 있던데 그럼 나쁘지 않지"
+    },
+    {
+      "id": "swing_accept_person_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "인격",
+      "text": "자아가 있으면 오히려 같이 살 방법을 찾는 게 맞지 않나"
+    },
+    {
+      "id": "swing_accept_gen_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": null,
+      "text": "처음엔 반대였는데 {키워드} 보니까 생각이 좀 바뀌네"
+    },
+    {
+      "id": "swing_backfire_person_01",
+      "seg": "sns_swing",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "인격",
+      "text": "근데 {키워드} 얘기 들으니까 좀 소름… 저걸 그냥 부품 취급해도 되나?"
+    },
+    {
+      "id": "swing_backfire_job_01",
+      "seg": "sns_swing",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "실업",
+      "text": "숫자놀음은 좋은데 {수치} 잘리는 사람들은 어쩌라고"
+    },
+    {
+      "id": "swing_backfire_clash_01",
+      "seg": "sns_swing",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "무력충돌",
+      "text": "사람이 다쳤다는데 이걸 이렇게 몰고 가도 되는 거임?"
+    },
+    {
+      "id": "swing_backfire_graft_01",
+      "seg": "sns_swing",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "유착",
+      "text": "{대상}이 주주라며? 그럼 이 법을 어떻게 믿냐"
+    },
+    {
+      "id": "swing_backfire_secret_01",
+      "seg": "sns_swing",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "비공개",
+      "text": "재료도 안 밝히면서 무작정 믿으라고? 좀 불안한데"
+    },
+    {
+      "id": "swing_backfire_gen_01",
+      "seg": "sns_swing",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": null,
+      "text": "이거 너무 대놓고 회사편 아니냐 갑자기 정신 드네"
+    },
+    {
+      "id": "swing_accept_opp_job_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "반대각",
+      "topic": "실업",
+      "text": "맞아 {수치}명이 길에 나앉는다는데 이게 무슨 진보냐"
+    },
+    {
+      "id": "swing_accept_opp_person_01",
+      "seg": "sns_swing",
+      "reaction": "수용",
+      "frame": "반대각",
+      "topic": "인격",
+      "text": "이름까지 있는 애를 판다니 이건 좀 아니지…"
+    },
+    {
+      "id": "against_backfire_gen_01",
+      "seg": "sns_against",
+      "reaction": "역풍",
+      "frame": null,
+      "topic": null,
+      "text": "역시 {대상} 편 기레기. 이런 걸 기사라고 쓰냐"
+    },
+    {
+      "id": "against_backfire_gen_02",
+      "seg": "sns_against",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": null,
+      "text": "돈 얼마 받고 쓴 기사냐? 양심 좀 챙겨라"
+    },
+    {
+      "id": "against_backfire_job_01",
+      "seg": "sns_against",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "실업",
+      "text": "우리 밥줄 끊기는 게 너네 눈엔 그냥 '효율'이지?"
+    },
+    {
+      "id": "against_backfire_person_01",
+      "seg": "sns_against",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "인격",
+      "text": "사람 자리를 깡통이 뺏는데 이게 무슨 진보야"
+    },
+    {
+      "id": "against_backfire_prod_01",
+      "seg": "sns_against",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "생산성",
+      "text": "{수치}? 그 숫자 뒤에 잘린 사람 몇인지는 안 세지"
+    },
+    {
+      "id": "against_backfire_clash_01",
+      "seg": "sns_against",
+      "reaction": "역풍",
+      "frame": "찬성각",
+      "topic": "무력충돌",
+      "text": "사병이 총 겨눴는데 노조 탓? 제정신이냐"
+    },
+    {
+      "id": "against_backfire_graft_01",
+      "seg": "sns_against",
+      "reaction": "역풍",
+      "frame": null,
+      "topic": "유착",
+      "text": "제 회사 법 만드는 놈들 편드는 신문이라니 참"
+    },
+    {
+      "id": "against_accept_opp_01",
+      "seg": "sns_against",
+      "reaction": "수용",
+      "frame": "반대각",
+      "topic": null,
+      "text": "이제야 제대로 된 기사 하나 나오네. 잘 썼다"
+    },
+    {
+      "id": "against_accept_opp_job_01",
+      "seg": "sns_against",
+      "reaction": "수용",
+      "frame": "반대각",
+      "topic": "실업",
+      "text": "그래 이게 현실이다. {수치}명 인생이 걸렸어"
+    },
+    {
+      "id": "old_accept_order_01",
+      "seg": "old_for",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": null,
+      "text": "혼란한 시기일수록 질서 있는 결단이 필요한 법입니다."
+    },
+    {
+      "id": "old_accept_comp_01",
+      "seg": "old_for",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "경쟁",
+      "text": "국익을 생각하면 선택의 여지가 없지요. {대상}에 밀릴 순 없습니다."
+    },
+    {
+      "id": "old_accept_prod_01",
+      "seg": "old_for",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "생산성",
+      "text": "산업의 진보를 감정으로 막을 순 없는 노릇입니다."
+    },
+    {
+      "id": "old_accept_safe_01",
+      "seg": "old_for",
+      "reaction": "수용",
+      "frame": "찬성각",
+      "topic": "안전",
+      "text": "위험한 노동을 기계가 대신하는 것은 문명의 진보입니다."
+    },
+    {
+      "id": "old_accept_job_01",
+      "seg": "old_for",
+      "reaction": "수용",
+      "frame": null,
+      "topic": "신직종",
+      "text": "새로운 기술에는 새로운 일자리가 따르기 마련이지요."
+    },
+    {
+      "id": "old_backfire_tone_01",
+      "seg": "old_for",
+      "reaction": "역풍",
+      "frame": null,
+      "topic": null,
+      "text": "이런 선정적인 논조는 신문의 품격을 떨어뜨립니다."
+    },
+    {
+      "id": "old_backfire_tone_02",
+      "seg": "old_for",
+      "reaction": "역풍",
+      "frame": null,
+      "topic": null,
+      "text": "젊은 기자들이 자극에만 기대는 것 같아 안타깝군요."
+    },
+    {
+      "id": "old_backfire_person_01",
+      "seg": "old_for",
+      "reaction": "역풍",
+      "frame": "반대각",
+      "topic": "인격",
+      "text": "기계에 인격이라니, 지나친 감상입니다."
+    },
+    {
+      "id": "apath_meh_01",
+      "seg": "apathetic",
+      "reaction": "시큰둥",
+      "frame": null,
+      "topic": null,
+      "text": "뭔 소린지 모르겠고 그래서 월급 오름?"
+    },
+    {
+      "id": "apath_meh_02",
+      "seg": "apathetic",
+      "reaction": "시큰둥",
+      "frame": null,
+      "topic": null,
+      "text": "관심 없음. 스크롤 내림"
+    },
+    {
+      "id": "apath_meh_03",
+      "seg": "apathetic",
+      "reaction": "시큰둥",
+      "frame": null,
+      "topic": null,
+      "text": "또 정치 얘기냐 지겹다"
+    },
+    {
+      "id": "apath_meh_04",
+      "seg": "apathetic",
+      "reaction": "시큰둥",
+      "frame": null,
+      "topic": null,
+      "text": "복잡한 건 됐고 결론만 말해줘"
+    },
+    {
+      "id": "apath_meh_05",
+      "seg": "apathetic",
+      "reaction": "시큰둥",
+      "frame": null,
+      "topic": null,
+      "text": "이런다고 세상 안 바뀜 ㅋ"
+    },
+    {
+      "id": "apath_meh_06",
+      "seg": "apathetic",
+      "reaction": "시큰둥",
+      "frame": null,
+      "topic": null,
+      "text": "밥이나 먹자"
+    },
+    {
+      "id": "apath_event_clash_01",
+      "seg": "apathetic",
+      "reaction": "수용",
+      "frame": "반대각",
+      "topic": "무력충돌",
+      "text": "사람이 다쳤다는 건 좀 심하긴 하네…"
+    },
+    {
+      "id": "apath_event_burn_01",
+      "seg": "apathetic",
+      "reaction": "수용",
+      "frame": "반대각",
+      "topic": "인격",
+      "text": "그건 좀 선 넘은 거 아님? 이건 나도 좀 그렇다"
+    }
+  ]
+}

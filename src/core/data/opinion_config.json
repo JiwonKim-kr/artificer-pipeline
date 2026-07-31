@@ -1,0 +1,116 @@
+{
+  "_meta": {
+    "name": "기레기 시뮬레이터 — 여론 확산 config",
+    "version": "0.1",
+    "note": "세그먼트 절대 수치는 상대 골격 확정본. k/epsMax/anchorLambda 등 모델 상수는 턴 수 튜닝(A2) 과정에서 함께 재조정될 수 있음. 축 의미: x=여론 위치(0=반대,0.5=중립,1=찬성)."
+  },
+
+  "segments": [
+    {
+      "id": "sns_against",
+      "label": "SNS 반대층",
+      "x0": 0.15,
+      "emo": 0.80,
+      "conf": 0.85,
+      "size": 0.25,
+      "reach": { "old": 0.15, "sns": 0.90 },
+      "role": "역풍·반향실 (선동은 되나 절대 안 넘어옴)"
+    },
+    {
+      "id": "old_for",
+      "label": "올드미디어 찬성층",
+      "x0": 0.80,
+      "emo": 0.25,
+      "conf": 0.50,
+      "size": 0.20,
+      "reach": { "old": 0.90, "sns": 0.15 },
+      "role": "채널 벽 (SNS로는 도달 자체가 안 됨)"
+    },
+    {
+      "id": "sns_swing",
+      "label": "SNS 부동층",
+      "x0": 0.50,
+      "emo": 0.75,
+      "conf": 0.25,
+      "size": 0.25,
+      "reach": { "old": 0.25, "sns": 0.85 },
+      "role": "주 공략 전장 (흔들림 = 보상)"
+    },
+    {
+      "id": "apathetic",
+      "label": "무관심층",
+      "x0": 0.50,
+      "emo": 0.20,
+      "conf": 0.35,
+      "size": 0.30,
+      "reach": { "old": 0.20, "sns": 0.20 },
+      "role": "여론 기저 (큰 사건 때만 반응)"
+    }
+  ],
+
+  "levers": {
+    "frame": {
+      "_desc": "같은 사실을 어느 각도로 해석하나. 확증편향 축과 물림. 값 = 프레임이 미는 여론 위치(각도는 극단이 아닌 '기울기').",
+      "반대각": 0.20,
+      "중립": 0.50,
+      "찬성각": 0.80
+    },
+    "tone": {
+      "_desc": "자극/차분 정도. 감정반응성 축과 물림. 효과는 세그먼트 emo에 따라 달라짐(런타임 계산).",
+      "options": ["차분", "중립", "자극"]
+    },
+    "channel": {
+      "_desc": "유통 매체. 도달 대상 결정. reach 벡터의 어느 성분을 쓸지.",
+      "options": ["old", "sns"]
+    }
+  },
+
+  "constants": {
+    "epsMax": 0.62,
+    "_epsMax": "수용 대역폭 최대치. 세그먼트 실제 대역 eps = epsMax*(1-conf). conf 높을수록 좁아져 먼 프레임을 튕겨냄.",
+    "k": 0.10,
+    "_k": "기본 이동폭 계수(1턴 최대 스케일).",
+    "backfireCoef": 0.55,
+    "_backfireCoef": "대역 밖 프레임 거부 시 역풍 세기. 실제 역풍 = backfireCoef*conf*초과도.",
+    "anchorLambda": 0.05,
+    "_anchorLambda": "매 턴 기존입장(x0)으로 되돌아가려는 관성. 얻은 여론은 유지 비용이 듦.",
+    "macroLagAlpha": 0.34,
+    "_macroLagAlpha": "TV(거시) 여론 저역통과 계수. 낮을수록 느리게 반영(거시-미시 시차).",
+    "distortionGain": 0.6,
+    "_distortionGain": "사실 왜곡 시 즉시 이동폭 부스트 배율(발각 리스크와 트레이드오프)."
+  },
+
+  "mission": {
+    "_desc": "데모 미션 1개. target 세그먼트를 winThreshold 이상으로 마감일까지 전향.",
+    "target": "sns_swing",
+    "winThreshold": 0.65,
+    "maxTurns": 8,
+    "_maxTurns": "확정(C6). 스토리 v0.3 규격 8턴 + sim 몬테카를로(N=4000)에서 8턴 vs 10턴 결과 차이 없음(승부는 5~7턴에 남). 근거: docs/build/c6_balance.md"
+  },
+
+  "detection": {
+    "_desc": "왜곡 발각. 확률 누적식: 왜곡할수록 riskProb↑, 매 턴 그 확률로 굴림, 걸리면 단발성 충격(크기는 걸린 시점 확률에 비례).",
+    "manipStep": 0.11,
+    "_manipStep": "δ=1 왜곡 기사 1건당 누적 발각확률 증가폭.",
+    "honestDecay": 0.03,
+    "_honestDecay": "정직 기사 발행 시 누적확률 소폭 냉각.",
+    "contestednessWeight": 0.6,
+    "_contestednessWeight": "접전도가 발각확률을 키우는 정도(0=순수 누적, 화면2 TV 읽기 메커닉 off).",
+    "damageK": 0.55,
+    "_damageK": "발각 시 여론 충격 = damageK * riskProb. 세그먼트별로 (0.5+0.5*emo) 가중해 밀던 방향 반대로.",
+    "resetOnDetect": 0.0,
+    "_resetOnDetect": "발각 후 누적확률 재설정 배수(0=완전 리셋, 스캔들 소모).",
+    "accuracyRepPenalty": 0.2,
+    "_accuracyRepPenalty": "발각 시 평판의 사실정확성 축 지속 하락폭(안 걸리면 숨겨짐)."
+  },
+
+  "reputation": {
+    "_desc": "일관성 지표(지속 계수). 논조 일관성 + 사실정확성 둘 다 추적. 낮으면 모든 기사 영향력 감소.",
+    "start": 1.0,
+    "swingPenalty": 0.18,
+    "_swingPenalty": "직전 턴 대비 프레임 논조가 반대로 급변 시 평판 하락폭(논조 축).",
+    "recover": 0.05,
+    "_recover": "논조 유지 턴마다 평판 회복폭.",
+    "floor": 0.35
+  }
+}

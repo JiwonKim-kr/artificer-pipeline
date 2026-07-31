@@ -1,0 +1,83 @@
+{
+  "rng_seed": 1,
+  "rng_uint32": [
+    2693262067,
+    11749833,
+    2265367787,
+    4213581821,
+    4159151403,
+    1207330352,
+    2632122864,
+    3095568220,
+    1828783984,
+    4272732017,
+    1955374602,
+    2099329838,
+    596715197,
+    1734070562,
+    1063107040,
+    663542962
+  ],
+  "scenario1_turn1_xs": {
+    "sns_against": 0.12932897466446638,
+    "old_for": 0.8,
+    "sns_swing": 0.5226209677419354,
+    "apathetic": 0.5010223325062034
+  },
+  "distort_seed1": [
+    {
+      "turn": 1,
+      "riskProb": 0.11,
+      "swing": 0.5361935483870968,
+      "detection": null
+    },
+    {
+      "turn": 2,
+      "riskProb": 0,
+      "swing": 0.4726416493236211,
+      "detection": {
+        "damage": 0.12100000000000001,
+        "riskAtCatch": 0.22
+      }
+    },
+    {
+      "turn": 3,
+      "riskProb": 0.11,
+      "swing": 0.4996730743764894,
+      "detection": null
+    },
+    {
+      "turn": 4,
+      "riskProb": 0.22,
+      "swing": 0.5321990727603783,
+      "detection": null
+    },
+    {
+      "turn": 5,
+      "riskProb": 0.33,
+      "swing": 0.5716828613814575,
+      "detection": null
+    },
+    {
+      "turn": 6,
+      "riskProb": 0,
+      "swing": 0.40826624919605925,
+      "detection": {
+        "damage": 0.24200000000000002,
+        "riskAtCatch": 0.44
+      }
+    },
+    {
+      "turn": 7,
+      "riskProb": 0.11,
+      "swing": 0.4265135470702312,
+      "detection": null
+    },
+    {
+      "turn": 8,
+      "riskProb": 0.22,
+      "swing": 0.44825441513832653,
+      "detection": null
+    }
+  ]
+}
