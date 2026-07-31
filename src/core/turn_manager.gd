@@ -19,6 +19,7 @@ const PRESSURE_BREAK := 4  # 반대 기사 누적 임계 → 배신파탄
 # 심사자 1회 플레이가 운으로 끝나는 일을 줄이되, 과욕(은폐2+)은 파탄 24%+실패 40%로
 # 여전히 벌받는다. 근거 수치: docs/build/c6_balance.md (sim 몬테카를로 N=4000)
 const DETECT_BREAK := 3
+const COMMENT_COOLDOWN := 5  # 최근 이만큼 쓴 댓글 id 는 재추출에서 제외(반복방어 9.3)
 
 var model: OpinionModel
 var content: Dictionary
@@ -27,6 +28,10 @@ var max_turns: int = 8
 var pressure: int = 0  # 반대 스탠스(반대각 기사) 누적 카운터
 var theo_discovered: bool = false  # F15(형 테오) 책상 발견 여부
 var theo_reported: bool = false    # 발견한 형 테오(F15)를 실제로 지면에 실었는가 (후일담 분기)
+# 댓글 반복방어용. model 의 발각 RNG(비트-정확 대조 대상)와 절대 분리한다 — 표현层이라
+# 결정성 불필요, 별도 RNG 로 매 게임 다른 댓글이 나오게 한다.
+var _comment_rng := RandomNumberGenerator.new()
+var _recent_comments: Array = []   # 최근 사용한 댓글 id (쿨다운 큐)
 var f16_unlocked: bool = false     # F16 취재선 개폐 (F7 반대각 보도 시 열림)
 
 func _init(seed: int = 1) -> void:
@@ -35,6 +40,7 @@ func _init(seed: int = 1) -> void:
 	tuning = _load_json(TUNING_PATH)
 	model = OpinionModel.new(cfg, seed)
 	max_turns = int((cfg.get("mission", {}) as Dictionary).get("maxTurns", 8))
+	_comment_rng.randomize()  # 댓글은 표현层 — 매 게임 다르게(발각 RNG 와 무관)
 
 ## 종료 판정: 발각 DETECT_BREAK회+ → 발각파탄 / 압박 누적 → 배신파탄 / 목표 도달 → 성공
 ## / maxTurns 도달 → 실패 / 그 외 진행("").
@@ -194,17 +200,40 @@ func _reaction_for(seg_id: String, micro: Dictionary) -> String:
 		return "수용"
 	return "역풍"
 
+## 반복방어(기획서 9.3): seg+reaction 후보 풀 → 쿨다운 제외 → frame 가점 가중 랜덤.
+## 같은 템플릿이 연속으로 재등장하지 않게 해 "가짜 티"를 막는다.
 func _pick_comment(seg_id: String, reaction: String, frame_label: String) -> Dictionary:
-	var best: Dictionary = {}
-	var best_score: int = -1
+	var pool: Array = []
 	for c in content.get("comments", []):
-		if str(c.get("seg", "")) != seg_id or str(c.get("reaction", "")) != reaction:
-			continue
-		var score: int = 0
+		if str(c.get("seg", "")) == seg_id and str(c.get("reaction", "")) == reaction:
+			pool.append(c)
+	if pool.is_empty():
+		return {}
+	# 최근 쓴 id 는 뺀다. 전부 최근이면(후보 고갈) 쿨다운 무시 폴백.
+	var fresh: Array = pool.filter(
+		func(c): return not _recent_comments.has(str(c.get("id", ""))))
+	var cand: Array = fresh if not fresh.is_empty() else pool
+	# 가중: 지배 프레임과 일치하는 댓글에 가점(관련성).
+	var weights: Array = []
+	var total: float = 0.0
+	for c in cand:
+		var w: float = 1.0
 		var cf: Variant = c.get("frame", null)
 		if cf != null and str(cf) == frame_label:
-			score += 2
-		if score > best_score:
-			best_score = score
-			best = c
-	return best
+			w += 2.0
+		weights.append(w)
+		total += w
+	var roll: float = _comment_rng.randf() * total
+	var pick: Dictionary = cand[0]
+	var acc: float = 0.0
+	for i in cand.size():
+		acc += weights[i]
+		if roll <= acc:
+			pick = cand[i]
+			break
+	var pid: String = str(pick.get("id", ""))
+	if pid != "":
+		_recent_comments.append(pid)
+		if _recent_comments.size() > COMMENT_COOLDOWN:
+			_recent_comments.pop_front()
+	return pick
