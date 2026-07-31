@@ -12,6 +12,7 @@ const ENDINGS := {
 	"성공": "표결일. 부동층이 찬성으로 돌아섰다. 「노동 근대화법」은 통과됐다.",
 	"실패": "표결일. 끝내 여론을 돌리지 못했다. 법안은 보류됐다.",
 	"발각파탄": "당신의 왜곡이 들통났다. 기자 자격을 잃고 편집국을 떠난다.",
+	"배신파탄": "의뢰를 저버린 대가. 모르겐社가 등을 돌리고, 당신은 편집국에서 쫓겨난다.",
 }
 
 var _tm: TurnManager
@@ -24,6 +25,7 @@ var _needle: Line2D
 var _status_label: Label
 var _turn_label: Label
 var _pub_button: Button
+var _pressure_label: Label
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -182,6 +184,10 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.5))
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(_status_label)
+	_pressure_label = Label.new()
+	_pressure_label.add_theme_color_override("font_color", Color(0.95, 0.4, 0.35))
+	_pressure_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(_pressure_label)
 	return panel
 
 func _make_comments(pos: Vector2, size: Vector2) -> Control:
@@ -235,6 +241,8 @@ func _on_publish() -> void:
 	_status_label.text = "%s · 논조 %s(δ=%.2f) · 부동층 %d%%" % [
 		report_txt, str(result["frame_label"]), float(result["distortion"]), int(round(swing * 100.0)),
 	]
+	if _pressure_label != null:
+		_pressure_label.text = str(result["pressure_hint"])
 	if bool(result["over"]):
 		_show_ending(str(result["ending"]))
 	else:

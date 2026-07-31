@@ -83,6 +83,22 @@ func _initialize() -> void:
 	else:
 		print("[PASS] 다중 턴 종료: %s (턴 %d/%d)" % [str(last["ending"]), int(last["turn"]), tm2.max_turns])
 
+	# 6) 압박: 반대각 기사 누적 → 배신파탄
+	var tm3 := TurnManager.new(1)
+	var unf3: Array = []
+	for b in tm3.get_blocks():
+		if str(b["tag"]) == "불리":
+			unf3.append(b["id"])
+	var pr: Dictionary = {}
+	for _t in tm3.max_turns:
+		pr = tm3.publish({"included_ids": unf3})  # 불리만 보도 = 반대각
+		if bool(pr["over"]):
+			break
+	if str(pr.get("ending", "")) != "배신파탄":
+		print("[FAIL] 반대각 누적인데 배신파탄 아님: %s (pressure=%d)" % [str(pr.get("ending", "")), int(pr.get("pressure", -1))]); failures += 1
+	else:
+		print("[PASS] 압박: 반대 기사 누적 → 배신파탄 (pressure=%d, 턴 %d)" % [int(pr["pressure"]), int(pr["turn"])])
+
 	if failures == 0:
 		print("TURN_RESULT: PASS")
 		quit(0)

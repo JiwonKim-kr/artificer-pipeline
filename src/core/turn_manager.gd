@@ -8,10 +8,19 @@ const CONFIG_PATH := "res://src/core/data/opinion_config.json"
 const CONTENT_PATH := "res://src/core/data/content_slice.json"
 const TUNING_PATH := "res://src/core/lever_tuning.json"
 
+# 압박(외압) 암시 문구 — 수치 비표시, 반대 기사 누적에 따른 단계별 노출(스토리 §2.3).
+const PRESSURE_HINTS := {
+	1: "편집장이 당신의 기사를 한참 들여다봤다.",
+	2: "모르겐社 홍보실에서 전화가 왔다더라. 반대 기사는 지면이 줄지도 모른다.",
+	3: "편집국 앞을 '강철 손'이 서성인다. 이번이 마지막 경고다.",
+}
+const PRESSURE_BREAK := 4  # 반대 기사 누적 임계 → 배신파탄
+
 var model: OpinionModel
 var content: Dictionary
 var tuning: Dictionary
 var max_turns: int = 8
+var pressure: int = 0  # 반대 스탠스(반대각 기사) 누적 카운터
 
 func _init(seed: int = 1) -> void:
 	var cfg: Dictionary = _load_json(CONFIG_PATH)
@@ -24,11 +33,19 @@ func _init(seed: int = 1) -> void:
 func check_ending() -> String:
 	if model.detections.size() >= 2:
 		return "발각파탄"
+	if pressure >= PRESSURE_BREAK:
+		return "배신파탄"
 	if model.is_won():
 		return "성공"
 	if model.turn >= max_turns:
 		return "실패"
 	return ""
+
+## 현재 압박 단계의 암시 문구(수치 비표시). 없으면 "".
+func pressure_hint() -> String:
+	if pressure <= 0:
+		return ""
+	return str(PRESSURE_HINTS.get(mini(pressure, 3), ""))
 
 static func _load_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
@@ -88,6 +105,8 @@ func publish(choices: Dictionary) -> Dictionary:
 	}
 	var snapshot: Dictionary = model.step(article)
 	var frame_label: String = _frame_label(frame_value)
+	if frame_label == "반대각":
+		pressure += 1  # 반대 스탠스 = 의뢰인 외압 누적
 	var ending: String = check_ending()
 	return {
 		"snapshot": snapshot,
@@ -100,6 +119,8 @@ func publish(choices: Dictionary) -> Dictionary:
 		"won": model.is_won(),
 		"turn": model.turn,
 		"max_turns": max_turns,
+		"pressure": pressure,
+		"pressure_hint": pressure_hint(),
 		"ending": ending,
 		"over": ending != "",
 	}
