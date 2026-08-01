@@ -94,16 +94,13 @@ func _build_desk() -> void:
 
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	box.add_theme_constant_override("separation", 10)
 	_desk.add_child(box)
-	var btn := Button.new()
+	var btn := _desk_button("모니터 켜기", 56)
 	btn.name = "MonitorButton"
-	btn.text = "모니터 켜기"
-	btn.custom_minimum_size = Vector2(220, 56)
 	btn.pressed.connect(_enter_screen)
 	box.add_child(btn)
-	_desk_search_btn = Button.new()
-	_desk_search_btn.text = "책상 뒤지기"
-	_desk_search_btn.custom_minimum_size = Vector2(220, 44)
+	_desk_search_btn = _desk_button("책상 뒤지기", 44)
 	_desk_search_btn.pressed.connect(_search_desk)
 	box.add_child(_desk_search_btn)
 	_desk_note = Label.new()
@@ -111,6 +108,31 @@ func _build_desk() -> void:
 	_desk_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_desk_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_desk_note)
+
+## 데스크 버튼: 기본 테마의 반투명 회색 패널은 디젤펑크 배경과 톤이 어긋난다.
+## 황동 테두리 + 어두운 바켈라이트 면으로 스타일 가이드(§2 재질)에 맞춘다.
+func _desk_button(label: String, height: int) -> Button:
+	var b := Button.new()
+	b.text = label
+	b.custom_minimum_size = Vector2(232, height)
+	var base := StyleBoxFlat.new()
+	base.bg_color = Color(0.13, 0.09, 0.06, 0.92)
+	base.border_color = Color(0.62, 0.45, 0.20)
+	base.set_border_width_all(2)
+	base.set_corner_radius_all(3)
+	base.set_content_margin_all(8)
+	var hover := base.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.22, 0.15, 0.08, 0.96)
+	hover.border_color = Color(0.90, 0.66, 0.28)
+	var pressed := base.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.30, 0.20, 0.10, 0.98)
+	b.add_theme_stylebox_override("normal", base)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", pressed)
+	b.add_theme_stylebox_override("focus", hover)
+	b.add_theme_color_override("font_color", Color(0.95, 0.82, 0.55))
+	b.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.66))
+	return b
 
 func _enter_screen() -> void:
 	_desk.visible = false
@@ -155,10 +177,12 @@ func _build_screen() -> void:
 	os.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_screen.add_child(os)
 	_os = os
-	os.add_child(_make_informant(Vector2(20, 48), Vector2(340, 320)))
-	os.add_child(_make_editor(Vector2(376, 48), Vector2(430, 540)))
-	os.add_child(_make_comments(Vector2(822, 48), Vector2(310, 400)))
-	os.add_child(_make_gauge(Vector2(20, 376), Vector2(340, 268)))
+	# 배치는 디자인 해상도 1152x648 기준. 프레임(9-slice)의 content margin 이
+	# 상 54·하 28·좌우 30 이므로 창을 그만큼 여유 있게 잡는다.
+	os.add_child(_make_informant(Vector2(20, 46), Vector2(340, 292)))
+	os.add_child(_make_editor(Vector2(376, 46), Vector2(432, 556)))
+	os.add_child(_make_comments(Vector2(824, 46), Vector2(308, 400)))
+	os.add_child(_make_gauge(Vector2(20, 350), Vector2(340, 252)))
 	var back := Button.new()
 	back.name = "BackButton"
 	back.text = "← 데스크 (Esc)"
@@ -187,6 +211,9 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 	panel.position = pos
 	panel.custom_minimum_size = size
 	panel.size = size
+	# 내용이 창 프레임 밖으로 새지 않게 자른다. 넘치는 내용은 각 창이 ScrollContainer 로
+	# 처리한다(잘라서 감추는 게 아니라 스크롤로 접근 가능하게).
+	panel.clip_contents = true
 	# 창 크롬: 브라스 프레임 텍스처를 9-slice(StyleBoxTexture)로 늘린다.
 	# 텍스처 512² 중 테두리 약 96px 이 장식부라 그만큼 마진으로 잡아 모서리를 보존한다.
 	var frame_tex := _res(WINDOW_FRAME)
@@ -199,8 +226,8 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 		# 본문은 테두리 안쪽으로. 상단은 프레임 타이틀바 장식을 피해 더 크게 잡는다.
 		sb.content_margin_left = 30.0
 		sb.content_margin_right = 30.0
-		sb.content_margin_top = 46.0
-		sb.content_margin_bottom = 26.0
+		sb.content_margin_top = 54.0   # 프레임 타이틀바 장식 아래로 본문을 내린다
+		sb.content_margin_bottom = 28.0
 		panel.add_theme_stylebox_override("panel", sb)
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
@@ -215,10 +242,23 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 func _body_of(panel: Node) -> VBoxContainer:
 	return panel.get_meta("body") as VBoxContainer
 
+## 세로 스크롤 영역을 만들어 그 안의 VBox 를 돌려준다. 내용이 창 높이를 넘겨도
+## (사실 F1~F16 처럼) 잘려서 사라지지 않고 스크롤로 읽을 수 있게 한다.
+func _scroll_body(parent: VBoxContainer) -> VBoxContainer:
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(sc)
+	var inner := VBoxContainer.new()
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(inner)
+	return inner
+
 # 정보원: 입수 정보(전부 진실). 유리/불리 태그는 노출하지 않음 — 판단은 플레이어 몫.
 func _make_informant(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "정보원 — 입수 정보")
-	var vb := _body_of(panel)
+	var vb := _scroll_body(_body_of(panel))
 	var facts: Dictionary = _tm.content.get("facts", {})
 	for fid in facts:
 		var f: Dictionary = facts[fid]
@@ -247,8 +287,9 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(hint)
 
-	_blocks_box = VBoxContainer.new()
-	vb.add_child(_blocks_box)
+	# 문장 블록은 사실이 늘수록 길어지므로 스크롤 영역에. 발행 버튼·상태 문구는
+	# 스크롤 밖(고정)에 둬서 항상 손이 닿게 한다.
+	_blocks_box = _scroll_body(vb)
 	_refresh_blocks()
 
 	var pub := Button.new()
@@ -308,23 +349,42 @@ func _make_gauge(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "여론 게이지 (거시·부정확)")
 	var vb := _body_of(panel)
 	var dial := Control.new()
-	dial.custom_minimum_size = Vector2(0, 190)
+	dial.custom_minimum_size = Vector2(0, 158)
+	dial.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	dial.clip_contents = true
 	vb.add_child(dial)
 	var tex := _res(GAUGE_TEX)
 	if tex != null:
 		var tr := TextureRect.new()
 		tr.texture = tex
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		# 기본 expand_mode 는 텍스처 원본(512²)을 최소 크기로 요구해 레이아웃을 밀어낸다.
+		# IGNORE_SIZE 로 두어야 앵커(FULL_RECT)를 따라 창 안에 맞춰 축소된다.
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		dial.add_child(tr)
 	_needle = Line2D.new()
-	_needle.points = PackedVector2Array([Vector2(0, 0), Vector2(0, -85)])
-	_needle.width = 4.0
+	_needle.width = 3.0
 	_needle.default_color = Color(1.0, 0.5, 0.2)
-	_needle.position = Vector2(160, 180)
 	dial.add_child(_needle)
+	# 바늘을 텍스처의 다이얼 축(중앙 상단쪽 점)에 맞춘다. 창 크기가 바뀌어도 따라가도록
+	# resized 에 연결한다. 하드코딩 좌표를 쓰면 창 치수를 조금만 건드려도 어긋난다.
+	dial.resized.connect(func() -> void: _fit_needle(dial))
+	_fit_needle(dial)
 	_set_needle(0.5)
 	return panel
+
+## KEEP_ASPECT_CENTERED 로 그려진 정사각 텍스처 안에서 다이얼 축 위치를 계산해
+## 바늘의 원점·길이를 맞춘다. (축은 텍스처 기준 가로 50% · 세로 35% 지점)
+func _fit_needle(dial: Control) -> void:
+	if _needle == null:
+		return
+	var s: float = minf(dial.size.x, dial.size.y)   # 실제로 그려지는 텍스처 한 변
+	var ox: float = (dial.size.x - s) * 0.5
+	var oy: float = (dial.size.y - s) * 0.5
+	_needle.position = Vector2(ox + s * 0.50, oy + s * 0.35)
+	_needle.points = PackedVector2Array([Vector2.ZERO, Vector2(0, -s * 0.20)])
 
 func _set_needle(macro: float) -> void:
 	if _needle != null:
