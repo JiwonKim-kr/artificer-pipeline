@@ -309,7 +309,7 @@ func _build_screen() -> void:
 		crt.material = mat
 	_screen.add_child(crt)
 
-func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
+func _window(pos: Vector2, size: Vector2, title: String, extra_top: float = 0.0) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.position = pos
 	panel.custom_minimum_size = size
@@ -326,12 +326,14 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 		# 9-slice 마진: 창이 340px 대인데 96(텍스처 장식 실폭)을 쓰면 모서리만으로
 		# 폭을 다 먹어 본문이 넘친다. 44 로 줄여 테두리 질감만 살린다.
 		sb.set_texture_margin_all(44.0)
-		# 본문은 테두리 안쪽으로. 브라스 장식이 좌우 ~44px 라 본문 여백을 그만큼 줘야
-		# 글자가 테두리 밑으로 삐져나가지 않는다(9-slice 마진과 맞춘다).
-		sb.content_margin_left = 44.0
-		sb.content_margin_right = 44.0
-		sb.content_margin_top = 56.0   # 프레임 타이틀바 장식 아래로 본문을 내린다
-		sb.content_margin_bottom = 38.0
+		# 본문 여백을 프레임 실측 브라스 두께에 맞춘다(512² 텍스처 기준: 상단 타이틀바
+		# ~64px 로 가장 두껍고, 하단·좌우는 ~52px). 이보다 작으면 글자가 장식 위로 올라탄다.
+		sb.content_margin_left = 46.0
+		sb.content_margin_right = 46.0
+		# 상단 70: 9-slice 특성상 창이 높을수록(원고 556px) 상단 브라스가 더 늘어나
+		# 두꺼워져서, 가장 높은 창 기준으로 잡는다(짧은 창은 여유만 더 생김).
+		sb.content_margin_top = 70.0 + extra_top  # 높은 창(원고)은 상단 브라스가 더 두꺼워 추가 여백
+		sb.content_margin_bottom = 48.0
 		panel.add_theme_stylebox_override("panel", sb)
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
@@ -417,7 +419,7 @@ func _refresh_informant() -> void:
 
 # 원고 작성: 각 문장 블록을 넣을지 말지 토글. 필수 없음. 전부 빼면 미보도.
 func _make_editor(pos: Vector2, size: Vector2) -> Control:
-	var panel := _window(pos, size, "원고 작성 — 실을 문장 선택")
+	var panel := _window(pos, size, "원고 작성 — 실을 문장 선택", 20.0)
 	var vb := _body_of(panel)
 	_turn_label = Label.new()
 	_turn_label.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
@@ -501,7 +503,8 @@ func _make_gauge(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "여론 게이지 (거시·부정확)")
 	var vb := _body_of(panel)
 	var dial := Control.new()
-	dial.custom_minimum_size = Vector2(0, 158)
+	# 여백이 커진 만큼(상64·하48) 다이얼 최소 높이를 줄여 창이 아래로 밀려 커지지 않게 한다.
+	dial.custom_minimum_size = Vector2(0, 120)
 	dial.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	dial.clip_contents = true
 	vb.add_child(dial)
