@@ -1,9 +1,19 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=12 format=3]
 
 ; 「태엽 인간」 1턴 수직 슬라이스 진입 씬. 루트 Main(Control)에 src/ui/main.gd 가
 ; 데스크→모니터 클릭→CRT OS UI 를 구성한다. spec: docs/specs/turn_loop_vertical_slice.md
 
 [ext_resource type="Script" path="res://src/ui/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="2_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/monitor_on.ogg" id="3_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="4_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/publish.ogg" id="5_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="6_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/detected.ogg" id="7_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="8_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/ending.ogg" id="9_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="10_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/clue_found.ogg" id="11_se_stream"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -13,3 +23,33 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_main")
+
+[node name="SeUiMonitorOn" type="AudioStreamPlayer" parent="."]
+script = ExtResource("2_se_emitter")
+stream = ExtResource("3_se_stream")
+target_path = NodePath("..")
+signal_name = &"monitor_powered"
+
+[node name="SeUiPublish" type="AudioStreamPlayer" parent="."]
+script = ExtResource("4_se_emitter")
+stream = ExtResource("5_se_stream")
+target_path = NodePath("..")
+signal_name = &"article_published"
+
+[node name="SeUiDetected" type="AudioStreamPlayer" parent="."]
+script = ExtResource("6_se_emitter")
+stream = ExtResource("7_se_stream")
+target_path = NodePath("..")
+signal_name = &"distortion_detected"
+
+[node name="SeUiEnding" type="AudioStreamPlayer" parent="."]
+script = ExtResource("8_se_emitter")
+stream = ExtResource("9_se_stream")
+target_path = NodePath("..")
+signal_name = &"ending_reached"
+
+[node name="SeUiClueFound" type="AudioStreamPlayer" parent="."]
+script = ExtResource("10_se_emitter")
+stream = ExtResource("11_se_stream")
+target_path = NodePath("..")
+signal_name = &"clue_found"
