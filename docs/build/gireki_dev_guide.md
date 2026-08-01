@@ -2,7 +2,7 @@
 
 > 대상: 이 게임 코드를 이어받아 개발할 팀원. 브랜치 `gireki-phase-c` 기준.
 > 이 문서만 읽으면 구조 파악 + 실행 + 확장(사실·댓글·엔딩 추가·밸런싱)까지 시작할 수 있다.
-> 상위 설계: `docs/specs/turn_loop_vertical_slice.md`, `docs/build/phase_c_plan.md`, `docs/design/*`.
+> 상위 설계: `docs/specs/turn_loop_vertical_slice.md`, `docs/specs/phase_c_turn_progression.md`, `docs/design/*`.
 
 ---
 
@@ -115,6 +115,6 @@ PYTHONUTF8=1 GODOT_BIN="$GODOT_BIN" python pipeline/scripts/play_test.py --scree
 
 ## 9. 참고
 - spec: `docs/specs/turn_loop_vertical_slice.md`, `docs/specs/phase_c_turn_progression.md`
-- 계획: `docs/build/turn_loop_ui_plan.md`, `docs/build/phase_c_plan.md`
+- 밸런싱 기록: `docs/build/c6_balance.md` · 콘텐츠 베이킹 계획: `docs/build/content_bake_plan.md`
 - 설계 원천: `docs/design/스토리_태엽인간_v0.3.md` 외
 - 웹 export 실측: `docs/web-export.md` · 파이프라인 규약: `docs/conventions.md`, `docs/command-catalog.md`

@@ -451,6 +451,17 @@
       "frame": "반대각",
       "topic": "인격",
       "text": "그건 좀 선 넘은 거 아님? 이건 나도 좀 그렇다"
-    }
+    },
+    { "id": "swing_wage_accept_01", "seg": "sns_swing", "reaction": "수용", "frame": "찬성각", "topic": "임금", "text": "임금 조정은 전환기라 어쩔 수 없나… 다시 오른다니 지켜는 봐야지" },
+    { "id": "swing_wage_backfire_01", "seg": "sns_swing", "reaction": "역풍", "frame": "찬성각", "topic": "임금", "text": "남은 사람 월급까지 깎였다는데 이걸 진보라 해도 되나" },
+    { "id": "swing_wage_opp_01", "seg": "sns_swing", "reaction": "수용", "frame": "반대각", "topic": "임금", "text": "결국 다 같이 임금 깎이는 거네. 이거 남 일 아니다" },
+    { "id": "against_wage_backfire_01", "seg": "sns_against", "reaction": "역풍", "frame": "찬성각", "topic": "임금", "text": "임금 30% 깎고 '일시적'? 그 말만 몇 년째다" },
+    { "id": "against_wage_opp_01", "seg": "sns_against", "reaction": "수용", "frame": "반대각", "topic": "임금", "text": "우리 임금 깎는 게 무슨 진보냐. 이제야 제대로 짚네" },
+    { "id": "old_wage_accept_01", "seg": "old_for", "reaction": "수용", "frame": "찬성각", "topic": "임금", "text": "전환기의 임금 조정은 감내할 몫이지요. 곧 회복될 겁니다." },
+    { "id": "old_wage_backfire_01", "seg": "old_for", "reaction": "역풍", "frame": "반대각", "topic": "임금", "text": "임금까지 들먹이며 선동하는 것은 지나칩니다." },
+    { "id": "apath_wage_meh_01", "seg": "apathetic", "reaction": "시큰둥", "frame": null, "topic": "임금", "text": "그래서 내 월급은 오르냐 내리냐. 그것만 말해라" },
+    { "id": "apath_wage_opp_01", "seg": "apathetic", "reaction": "수용", "frame": "반대각", "topic": "임금", "text": "월급 깎인다는 건 나도 싫긴 하다…" },
+    { "id": "against_secret_backfire_01", "seg": "sns_against", "reaction": "역풍", "frame": "찬성각", "topic": "비공개", "text": "재료도 안 밝히면서 믿으라고? 숨기는 게 죄다" },
+    { "id": "old_secret_doubt_01", "seg": "old_for", "reaction": "의심", "frame": null, "topic": "비공개", "text": "회사도 좀 더 투명했으면 하는 아쉬움은 있습니다." }
   ]
 }
