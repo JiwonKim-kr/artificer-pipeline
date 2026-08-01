@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "style_guide": null,
+  "style_guide": "docs/style_guide.md",
   "entries": [
     {
       "id": "art:ui/main/desk_bg",

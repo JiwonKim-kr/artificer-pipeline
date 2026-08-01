@@ -19,6 +19,7 @@ CLI 서브커맨드:
   validate        스키마 + 도메인 규칙 검증 (verify 게이트 #4)
   add             entry 추가 (검증 통과 시에만 기록)
   update-status   entry 의 status 갱신 + history 기록
+  set-style-guide art lock 승인 결과(스타일 가이드 경로) 잠금/해제
   list            entry 목록 출력
 
 종료 코드: 0 = 성공/유효, 1 = 검증 실패/규칙 위반, 2 = 실행 오류.
@@ -424,6 +425,37 @@ def _cmd_update_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_set_style_guide(args: argparse.Namespace) -> int:
+    """art lock 승인 결과(스타일 가이드 문서 경로)를 매니페스트에 잠근다.
+
+    사람 승인 후에만 호출되어야 한다(art lock 은 생략 불가한 승인 지점).
+    `--clear` 로 잠금 해제(null)도 가능하다.
+    """
+    schema = load_schema(args.schema)
+    manifest = load_manifest(args.manifest)
+
+    if args.clear:
+        manifest["style_guide"] = None
+    else:
+        if not args.path:
+            print("오류: --path 또는 --clear 가 필요합니다.", file=sys.stderr)
+            return 2
+        target = Path(args.path)
+        if not target.exists():
+            print(f"오류: 스타일 가이드 문서가 없습니다: {args.path}", file=sys.stderr)
+            return 2
+        manifest["style_guide"] = args.path
+
+    try:
+        save_manifest(manifest, args.manifest, schema)
+    except ManifestValidationError as exc:
+        print("style_guide 설정 실패 — 검증 통과하지 못해 매니페스트를 쓰지 않았습니다:", file=sys.stderr)
+        _print_errors(exc.errors)
+        return 1
+    print(f"style_guide = {manifest['style_guide']!r} → {args.manifest}")
+    return 0
+
+
 def _cmd_list(args: argparse.Namespace) -> int:
     manifest = load_manifest(args.manifest)
     entries = manifest.get("entries", [])
@@ -491,6 +523,11 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--feedback", default=None, help="반려/검수 피드백 (history 에 기록)")
     pu.add_argument("--file", default=None, help="반영 파일 경로 갱신")
     pu.set_defaults(func=_cmd_update_status)
+
+    ps = sub.add_parser("set-style-guide", help="art lock 승인 결과(스타일 가이드 경로) 잠금")
+    ps.add_argument("--path", default=None, help="스타일 가이드 문서 경로 (예: docs/style_guide.md)")
+    ps.add_argument("--clear", action="store_true", help="스타일 잠금 해제(null)")
+    ps.set_defaults(func=_cmd_set_style_guide)
 
     pl = sub.add_parser("list", help="entry 목록 출력")
     pl.add_argument("--track", choices=["art", "se", "bgm", "text"])
