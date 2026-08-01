@@ -21,6 +21,16 @@ const EPILOGUES := {
 	"냉혹": "형 테오의 이름은 끝내 지면에 오르지 않았다. 제 가족은 지키고 남의 삶은 팔았다. 거울 속 얼굴이 낯설다.",
 }
 
+# ---------- SE 시그널 (se attach 가 code_event 로 구독) ----------
+## 이 시그널들은 게임 로직에 영향을 주지 않는다. se_emitter 브리지가 구독해
+## 효과음만 재생한다(src/core 무지 원칙). 매니페스트 code_event 의 메서드명은
+## 이 시그널명과 동일하게 지정한다(se_attach.derive_signal 규칙 ①).
+signal monitor_powered       # 모니터 켜기 → CRT 전원 인
+signal article_published     # 발행 → 타자기 카춘크
+signal distortion_detected   # 이번 턴 신규 발각 → 스팅어
+signal ending_reached        # 엔딩 도달
+signal clue_found            # 책상에서 형 테오 흔적 발견
+
 var _tm: TurnManager
 var _desk: Control
 var _screen: Control
@@ -104,9 +114,22 @@ func _build_desk() -> void:
 func _enter_screen() -> void:
 	_desk.visible = false
 	_screen.visible = true
+	monitor_powered.emit()
+
+func _exit_screen() -> void:
+	_screen.visible = false
+	_desk.visible = true
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_ESCAPE:
+		if _screen != null and _screen.visible:
+			_exit_screen()
+		elif _desk != null and _desk.visible:
+			_enter_screen()
 
 func _search_desk() -> void:
 	if _tm.discover_theo():
+		clue_found.emit()
 		_refresh_blocks()
 		_desk_note.text = "책상 CRT 수신함에서 형 테오의 흔적을 찾았다. (원고에 추가됨)"
 		if _desk_search_btn != null:
@@ -131,10 +154,17 @@ func _build_screen() -> void:
 	os.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_screen.add_child(os)
 	_os = os
-	os.add_child(_make_informant(Vector2(20, 20), Vector2(340, 320)))
-	os.add_child(_make_editor(Vector2(376, 20), Vector2(430, 540)))
-	os.add_child(_make_comments(Vector2(822, 20), Vector2(310, 400)))
-	os.add_child(_make_gauge(Vector2(20, 356), Vector2(340, 272)))
+	os.add_child(_make_informant(Vector2(20, 48), Vector2(340, 320)))
+	os.add_child(_make_editor(Vector2(376, 48), Vector2(430, 540)))
+	os.add_child(_make_comments(Vector2(822, 48), Vector2(310, 400)))
+	os.add_child(_make_gauge(Vector2(20, 376), Vector2(340, 268)))
+	var back := Button.new()
+	back.name = "BackButton"
+	back.text = "← 데스크 (Esc)"
+	back.position = Vector2(12, 10)
+	back.custom_minimum_size = Vector2(150, 30)
+	back.pressed.connect(_exit_screen)
+	os.add_child(back)
 
 	var bbc := BackBufferCopy.new()
 	bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
@@ -290,7 +320,11 @@ func _on_publish() -> void:
 	for entry in _block_checks:
 		if (entry["cb"] as CheckBox).button_pressed:
 			included.append(entry["id"])
+	var det_before: int = _tm.model.detections.size()
 	var result := _tm.publish({"included_ids": included})
+	article_published.emit()
+	if _tm.model.detections.size() > det_before:
+		distortion_detected.emit()  # 이번 턴에 왜곡이 새로 들통났다
 	_render_comments(result["comments"])
 	var snap: Dictionary = result["snapshot"]
 	_set_needle(float(snap["tvMacro"]))
@@ -317,6 +351,7 @@ func _update_turn_label() -> void:
 		_turn_label.text = "턴 %d / %d" % [_tm.model.turn + 1, _tm.max_turns]
 
 func _show_ending(ending: String, epi: String = "") -> void:
+	ending_reached.emit()
 	if _pub_button != null:
 		_pub_button.disabled = true
 	var panel := PanelContainer.new()

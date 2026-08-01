@@ -58,6 +58,121 @@
           "action": "registered"
         }
       ]
+    },
+    {
+      "id": "se:ui/monitor_on",
+      "track": "se",
+      "status": "generated",
+      "spec": "모니터 켜기 → CRT 전원 인(부팅 험). jsfxr powerUp, 절차생성.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::monitor_powered"
+        }
+      ],
+      "file": "assets/audio/se/monitor_on.ogg",
+      "history": [
+        {
+          "at": "2026-08-01T05:49:38.943810+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-08-01T05:50:00.194017+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "se:ui/publish",
+      "track": "se",
+      "status": "generated",
+      "spec": "발행 → 타자기 카춘크(이중 클랙). jsfxr, 절차생성.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::article_published"
+        }
+      ],
+      "file": "assets/audio/se/publish.ogg",
+      "history": [
+        {
+          "at": "2026-08-01T05:49:39.090841+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-08-01T05:50:00.335014+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "se:ui/detected",
+      "track": "se",
+      "status": "generated",
+      "spec": "왜곡 발각 스팅어(경보, 이번 턴 신규 발각 시). jsfxr noise, 절차생성.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::distortion_detected"
+        }
+      ],
+      "file": "assets/audio/se/detected.ogg",
+      "history": [
+        {
+          "at": "2026-08-01T05:49:39.248358+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-08-01T05:50:00.476016+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "se:ui/ending",
+      "track": "se",
+      "status": "generated",
+      "spec": "엔딩 도달 스팅어(신스 텔). jsfxr synth, 절차생성.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::ending_reached"
+        }
+      ],
+      "file": "assets/audio/se/ending.ogg",
+      "history": [
+        {
+          "at": "2026-08-01T05:49:39.402941+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-08-01T05:50:00.623618+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "se:ui/clue_found",
+      "track": "se",
+      "status": "generated",
+      "spec": "책상에서 형 테오 흔적 발견 블립(발견). jsfxr blipSelect, 절차생성.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::clue_found"
+        }
+      ],
+      "file": "assets/audio/se/clue_found.ogg",
+      "history": [
+        {
+          "at": "2026-08-01T05:49:39.559942+00:00",
+          "action": "registered"
+        },
+        {
+          "at": "2026-08-01T05:50:00.768620+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }
