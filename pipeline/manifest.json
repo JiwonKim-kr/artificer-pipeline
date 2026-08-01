@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "style_guide": null,
+  "style_guide": "docs/style_guide.md",
   "entries": [
     {
       "id": "art:ui/main/desk_bg",
       "track": "art",
-      "status": "placeholder",
+      "status": "generated",
       "spec": "정면 책상 배경(꺼진 CRT 모니터·타자기·소품). 1인칭 정적 배경. 실제 배경은 16:9 최종+review 후 reskin.",
       "requested_by": [
         {
@@ -13,18 +13,22 @@
           "path": "scenes/main.tscn::Main/DeskView/Background"
         }
       ],
-      "file": "assets/art/ui/main/PLACEHOLDER_desk_bg.png",
+      "file": "assets/art/ui/main/desk_bg.png",
       "history": [
         {
           "at": "2026-07-31T04:51:18.017452+00:00",
           "action": "registered"
+        },
+        {
+          "at": "2026-08-01T08:51:58.944826+00:00",
+          "action": "generated"
         }
       ]
     },
     {
       "id": "art:ui/window/frame",
       "track": "art",
-      "status": "placeholder",
+      "status": "generated",
       "spec": "레트로 OS 창 크롬(브라스+바켈라이트 테두리, 타이틀바). 9-slice.",
       "requested_by": [
         {
@@ -32,18 +36,22 @@
           "path": "scenes/main.tscn::Main/ScreenState/ScreenOS"
         }
       ],
-      "file": "assets/art/ui/window/PLACEHOLDER_frame.png",
+      "file": "assets/art/ui/window/frame.png",
       "history": [
         {
           "at": "2026-07-31T04:51:18.228454+00:00",
           "action": "registered"
+        },
+        {
+          "at": "2026-08-01T08:51:58.979931+00:00",
+          "action": "generated"
         }
       ]
     },
     {
       "id": "art:ui/gauge/opinion_needle",
       "track": "art",
-      "status": "placeholder",
+      "status": "generated",
       "spec": "부정확 아날로그 여론 게이지(판+떨리는 바늘, 숫자 없음).",
       "requested_by": [
         {
@@ -51,11 +59,15 @@
           "path": "scenes/main.tscn::Main/ScreenState/ScreenOS/OpinionGauge"
         }
       ],
-      "file": "assets/art/ui/gauge/PLACEHOLDER_opinion_needle.png",
+      "file": "assets/art/ui/gauge/opinion_needle.png",
       "history": [
         {
           "at": "2026-07-31T04:51:18.433452+00:00",
           "action": "registered"
+        },
+        {
+          "at": "2026-08-01T08:51:59.015225+00:00",
+          "action": "generated"
         }
       ]
     },

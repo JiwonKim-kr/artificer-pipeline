@@ -25,6 +25,7 @@ import mimetypes
 import os
 import sys
 import time
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -33,6 +34,14 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import env_config  # noqa: E402
+
+# macOS 등에서 Python 이 시스템 CA 번들을 못 찾아 SSL 검증이 실패하는 것을 막는다.
+# certifi 가 있으면 그 CA 로 컨텍스트를 구성하고, 없으면 시스템 기본(None)을 쓴다.
+try:
+    import certifi  # noqa: E402
+    _SSL_CTX: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+except Exception:  # certifi 미설치 등 — 기본 컨텍스트로 폴백
+    _SSL_CTX = None
 
 # ===========================================================================
 # 엔드포인트 단일 진실 공급원 (SINGLE SOURCE OF TRUTH)
@@ -282,7 +291,7 @@ def send(prepared: PreparedRequest, *, timeout: float = 60.0) -> dict:
         prepared.url, data=data, headers=prepared.headers, method=prepared.method
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:
             raw = resp.read().decode("utf-8")
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as exc:
@@ -323,7 +332,7 @@ def poll_job(job_id: str, auth: str, *, timeout: float, interval: float = 3.0) -
 def _download(url: str, dest: Path, *, timeout: float = 120.0) -> None:
     req = urllib.request.Request(url, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(resp.read())
     except (urllib.error.URLError, TimeoutError) as exc:
