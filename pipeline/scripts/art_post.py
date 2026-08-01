@@ -83,11 +83,22 @@ def probe_image(path: Path) -> dict:
 # ---------------------------------------------------------------------------
 # resize (nearest-neighbor)
 # ---------------------------------------------------------------------------
+# ffmpeg scale flags 중 허용 값. neighbor=픽셀아트(격자 보존),
+# lanczos/bicubic=회화체·사진체(축소 시 계단현상 방지).
+RESIZE_FILTERS = ("neighbor", "lanczos", "bicubic", "bilinear", "spline")
+
+
 def resize_image(
-    src: Path, dst: Path, *, width: int | None, height: int | None, scale: float | None
+    src: Path, dst: Path, *, width: int | None, height: int | None, scale: float | None,
+    filter_name: str = "neighbor",
 ) -> None:
-    """nearest-neighbor 리사이즈. width/height 직접 지정 또는 scale 배수.
-    투명(alpha)을 보존한다."""
+    """리사이즈. width/height 직접 지정 또는 scale 배수. 투명(alpha)을 보존한다.
+
+    보간 필터는 **인자(데이터)로 받는다** — 픽셀아트는 neighbor, 회화체 아트는
+    lanczos 처럼 아트 스타일에 맞춰 고른다(스타일 하드코딩 금지 원칙).
+    """
+    if filter_name not in RESIZE_FILTERS:
+        raise ValueError(f"지원하지 않는 필터: {filter_name} (허용: {', '.join(RESIZE_FILTERS)})")
     if scale is not None:
         info = probe_image(src)
         width = max(1, round(int(info["width"]) * scale))
@@ -95,8 +106,8 @@ def resize_image(
     if not width or not height:
         raise ValueError("resize 에는 --width/--height 또는 --scale 이 필요합니다.")
     dst.parent.mkdir(parents=True, exist_ok=True)
-    # flags=neighbor: 블러 없는 픽셀 확대/축소. format=rgba + -pix_fmt rgba: 알파 보존.
-    vf = f"scale={width}:{height}:flags=neighbor,format=rgba"
+    # format=rgba + -pix_fmt rgba: 알파 보존.
+    vf = f"scale={width}:{height}:flags={filter_name},format=rgba"
     proc = subprocess.run(
         [_ffmpeg(), "-y", "-i", str(src), "-vf", vf, "-pix_fmt", "rgba", str(dst)],
         capture_output=True, text=True,
@@ -177,6 +188,7 @@ def _cmd_resize(args: argparse.Namespace) -> int:
     resize_image(
         Path(args.input), Path(args.output),
         width=args.width, height=args.height, scale=args.scale,
+        filter_name=args.filter,
     )
     info = probe_image(Path(args.output))
     print(f"리사이즈 완료: {args.output} ({info['width']}x{info['height']}, "
@@ -210,12 +222,14 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--input", required=True)
     pp.set_defaults(func=_cmd_probe)
 
-    pr = sub.add_parser("resize", help="nearest-neighbor 리사이즈 (투명 유지)")
+    pr = sub.add_parser("resize", help="리사이즈 (투명 유지, 보간 필터 선택)")
     pr.add_argument("--input", required=True)
     pr.add_argument("--output", required=True)
     pr.add_argument("--width", type=int, default=None)
     pr.add_argument("--height", type=int, default=None)
     pr.add_argument("--scale", type=float, default=None, help="배수 (예: 2.0). width/height 대신 사용.")
+    pr.add_argument("--filter", default="neighbor", choices=RESIZE_FILTERS,
+                    help="보간 필터. 픽셀아트=neighbor(기본), 회화체=lanczos 권장.")
     pr.set_defaults(func=_cmd_resize)
 
     pk = sub.add_parser("pack", help="동일 크기 프레임 → 스프라이트시트 (tile 필터)")
