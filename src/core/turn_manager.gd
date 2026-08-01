@@ -94,6 +94,9 @@ func get_blocks() -> Array:
 			continue   # F15: 책상에서 발견해야 등장
 		if bool(fdict.get("gated", false)) and not f16_unlocked:
 			continue   # F16: F7 반대각 보도로 열려야 등장
+		var t: int = int(fdict.get("turn", 0))
+		if t > 0 and t > model.turn + 1:
+			continue   # 비트시트: 아직 도착하지 않은 사실(이번 턴 = model.turn+1)
 		var frags: Array = fdict.get("fragments", [])
 		for i in frags.size():
 			var frag: Dictionary = frags[i]
