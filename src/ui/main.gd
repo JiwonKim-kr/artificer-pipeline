@@ -55,6 +55,10 @@ var _article_box: VBoxContainer     # 발행 기사 카드(헤드라인+본문)
 var _settings_panel: PanelContainer # 소리 설정 오버레이
 var _se_vol: float = 0.4            # 효과음 볼륨(0~1, 기본 ≈ -8dB)
 var _bgm_vol: float = 0.5           # 배경음 볼륨(0~1, BGM 추가 대비)
+var _carryover_selected: Array = [] # 「받은 자료」에서 이번 기사에 끌어온 과거 fact id (턴마다 초기화)
+var _archive_panel: PanelContainer  # 「받은 자료」 오버레이(과거 정보 열람·선별)
+var _archive_body: VBoxContainer
+var _archive_btn: Button            # 정보원 패널의 「받은 자료」 버튼(개수 표시)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -244,6 +248,90 @@ func _save_audio_settings() -> void:
 	cfg.set_value("audio", "bgm", _bgm_vol)
 	cfg.save(SETTINGS_PATH)
 
+# ---------- 받은 자료(과거 정보 열람·선별) ----------
+func _build_archive_panel(parent: Control) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "ArchivePanel"
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(560, 460)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.07, 0.09, 0.07, 0.97)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.7, 0.55, 0.25)
+	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(18)
+	panel.add_theme_stylebox_override("panel", sb)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	panel.add_child(vb)
+	var title := Label.new()
+	title.text = "▍ 받은 자료 — 지난 정보를 이 기사에 끌어오기"
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
+	vb.add_child(title)
+	vb.add_child(HSeparator.new())
+	_archive_body = _scroll_body(vb)
+	var close := Button.new()
+	close.text = "닫기"
+	close.pressed.connect(func() -> void: panel.visible = false)
+	vb.add_child(close)
+	panel.visible = false
+	parent.add_child(panel)
+	_archive_panel = panel
+
+func _toggle_archive() -> void:
+	if _archive_panel == null:
+		return
+	_archive_panel.visible = not _archive_panel.visible
+	if _archive_panel.visible:
+		_refresh_archive()
+		_archive_panel.move_to_front()
+
+## 「받은 자료」 목록을 다시 그린다: 과거(오늘 아님) 가용 사실 + 기사에 넣기/빼기 토글.
+func _refresh_archive() -> void:
+	if _archive_body == null:
+		return
+	for c in _archive_body.get_children():
+		c.queue_free()
+	var facts: Dictionary = _tm.content.get("facts", {})
+	var cur_turn: int = _cur_turn()
+	var any := false
+	for fid in _available_fact_ids():
+		var f: Dictionary = facts.get(fid, {})
+		if _is_today_fact(f, cur_turn):
+			continue  # 오늘 것은 정보원 패널에 이미 있음
+		any = true
+		var picked: bool = _carryover_selected.has(fid)
+		var row := VBoxContainer.new()
+		var head := Label.new()
+		head.text = "↩ 이월 T%d  %s" % [int(f.get("turn", 0)), str(f.get("title", ""))]
+		head.add_theme_color_override("font_color", Color(0.7, 0.8, 0.95))
+		row.add_child(head)
+		for frag in f.get("fragments", []):
+			var l := Label.new()
+			l.text = str(frag.get("text", ""))
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.modulate = Color(0.85, 0.85, 0.8)
+			row.add_child(l)
+		var btn := Button.new()
+		btn.text = "기사에서 빼기" if picked else "이 기사에 넣기"
+		btn.pressed.connect(func() -> void: _toggle_carryover(fid))
+		row.add_child(btn)
+		row.add_child(HSeparator.new())
+		_archive_body.add_child(row)
+	if not any:
+		var none := Label.new()
+		none.text = "아직 이월된 자료가 없습니다."
+		none.modulate = Color(0.65, 0.65, 0.6)
+		_archive_body.add_child(none)
+
+func _toggle_carryover(fid: String) -> void:
+	if _carryover_selected.has(fid):
+		_carryover_selected.erase(fid)
+	else:
+		_carryover_selected.append(fid)
+	_refresh_blocks()   # 원고 창에 즉시 반영
+	_refresh_archive()  # 버튼 라벨 갱신
+
 func _search_desk() -> void:
 	if _tm.discover_theo():
 		clue_found.emit()
@@ -293,6 +381,7 @@ func _build_screen() -> void:
 	settings_btn.pressed.connect(_toggle_settings)
 	os.add_child(settings_btn)
 	_build_settings_panel(os)
+	_build_archive_panel(os)
 
 	var bbc := BackBufferCopy.new()
 	bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
@@ -363,11 +452,37 @@ func _scroll_body(parent: VBoxContainer) -> VBoxContainer:
 	return inner
 
 # 정보원: 입수 정보(전부 진실). 유리/불리 태그는 노출하지 않음 — 판단은 플레이어 몫.
-# 턴별 드립: 이번 턴까지 도착한 사실만, 오늘 입수/이월을 구분해 보여준다(_refresh_informant).
+func _cur_turn() -> int:
+	return _tm.model.turn + 1
+
+## 이번 턴까지 도착한(가용) fact id 목록(등장 순서, 중복 제거). get_blocks = 코어 단일 게이팅 재사용.
+func _available_fact_ids() -> Array:
+	var out: Array = []
+	var seen: Dictionary = {}
+	for b in _tm.get_blocks():
+		var fid: String = str(b["fact"])
+		if not seen.has(fid):
+			seen[fid] = true
+			out.append(fid)
+	return out
+
+## 이 fact 가 '오늘 것'인가 — 정보원/원고에 기본 노출되는 대상.
+## 오늘 도착(turn==현재) 또는 숨김 발견형(F15, 발견되면 항상 노출).
+func _is_today_fact(fdict: Dictionary, cur_turn: int) -> bool:
+	if bool(fdict.get("hidden", false)):
+		return true
+	return int(fdict.get("turn", 0)) == cur_turn
+
+# 정보원: 오늘 입수한 정보만 보여준다(과부하 방지). 과거 정보는 「받은 자료」 오버레이로.
 func _make_informant(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "정보원 — 입수 정보")
 	_informant_title = panel.get_meta("title_label") as Label
-	_informant_body = _scroll_body(_body_of(panel))
+	var body := _body_of(panel)
+	_archive_btn = Button.new()
+	_archive_btn.text = "받은 자료"
+	_archive_btn.pressed.connect(_toggle_archive)
+	body.add_child(_archive_btn)
+	_informant_body = _scroll_body(body)
 	_refresh_informant()
 	return panel
 
@@ -381,41 +496,35 @@ func _refresh_informant() -> void:
 		_informant_body.remove_child(c)
 		c.free()
 	var facts: Dictionary = _tm.content.get("facts", {})
-	var cur_turn: int = _tm.model.turn + 1
-	# get_blocks 순서(=facts 삽입 순서) 유지하며 등장 fact 를 중복 없이 수집.
-	var available: Array = []
-	var seen: Dictionary = {}
-	for b in _tm.get_blocks():
-		var fid: String = str(b["fact"])
-		if not seen.has(fid):
-			seen[fid] = true
-			available.append(fid)
+	var cur_turn: int = _cur_turn()
 	var today: int = 0
-	for fid in available:
+	var carried: int = 0
+	for fid in _available_fact_ids():
 		var f: Dictionary = facts.get(fid, {})
-		var ft: int = int(f.get("turn", 0))
-		var is_today: bool = ft == cur_turn
-		if is_today:
-			today += 1
-		var badge: String
-		if is_today:
-			badge = "● 오늘 입수"
-		elif ft > 0:
-			badge = "· 이월 T%d" % ft
-		else:
-			badge = "· 단서(책상)"  # F15: 턴 없이 발견으로 등장
+		if not _is_today_fact(f, cur_turn):
+			carried += 1
+			continue  # 과거 정보는 정보원 패널이 아니라 「받은 자료」로
+		today += 1
+		var is_clue: bool = bool(f.get("hidden", false))
 		var head := Label.new()
-		head.text = "%s  %s" % [badge, str(f.get("title", ""))]
-		head.add_theme_color_override("font_color",
-			Color(1.0, 0.85, 0.4) if is_today else Color(0.55, 0.72, 0.6))
+		head.text = "%s  %s" % ["· 단서(책상)" if is_clue else "● 오늘 입수", str(f.get("title", ""))]
+		head.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
 		_informant_body.add_child(head)
 		for frag in f.get("fragments", []):
 			var l := Label.new()
-			l.text = "   %s" % str(frag.get("text", ""))
+			l.text = str(frag.get("text", ""))
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_informant_body.add_child(l)
+	if today == 0:
+		var none := Label.new()
+		none.text = "오늘 새로 들어온 정보가 없습니다."
+		none.modulate = Color(0.65, 0.65, 0.6)
+		_informant_body.add_child(none)
 	if _informant_title != null:
-		_informant_title.text = "▍ 정보원 — 오늘 %d · 누적 %d" % [today, available.size()]
+		_informant_title.text = "▍ 정보원 — 오늘 입수 %d" % today
+	if _archive_btn != null:
+		_archive_btn.text = "받은 자료 (%d)" % carried
+		_archive_btn.disabled = carried == 0
 
 # 원고 작성: 각 문장 블록을 넣을지 말지 토글. 필수 없음. 전부 빼면 미보도.
 func _make_editor(pos: Vector2, size: Vector2) -> Control:
@@ -470,25 +579,36 @@ func _refresh_blocks() -> void:
 		c.free()
 	_block_checks.clear()
 	var facts: Dictionary = _tm.content.get("facts", {})
-	var cur_turn: int = _tm.model.turn + 1
+	var cur_turn: int = _cur_turn()
 	var last_fact := ""
+	var shown_any := false
 	for b in _tm.get_blocks():
-		if b["fact"] != last_fact:
-			last_fact = str(b["fact"])
-			var fdict: Dictionary = facts.get(last_fact, {})
-			var ft: int = int(fdict.get("turn", 0))
-			var is_today: bool = ft == cur_turn
-			var mark: String = "● " if is_today else ""
+		var fid: String = str(b["fact"])
+		var fdict: Dictionary = facts.get(fid, {})
+		var is_today: bool = _is_today_fact(fdict, cur_turn)
+		# 원고에는 오늘 것 + 「받은 자료」에서 끌어온 과거 사실만 노출(난잡·과부하 방지).
+		if not is_today and not _carryover_selected.has(fid):
+			continue
+		shown_any = true
+		if fid != last_fact:
+			last_fact = fid
+			var mark: String = "● " if is_today else "↩ 이월 "
 			var fh := Label.new()
-			fh.text = "%s[%s]" % [mark, str(fdict.get("title", last_fact))]
+			fh.text = "%s[%s]" % [mark, str(fdict.get("title", fid))]
 			fh.add_theme_color_override("font_color",
-				Color(1.0, 0.85, 0.4) if is_today else Color(0.55, 0.8, 0.95))
+				Color(1.0, 0.85, 0.4) if is_today else Color(0.7, 0.8, 0.95))
 			_blocks_box.add_child(fh)
 		var cb := CheckBox.new()
 		cb.text = str(b["text"])
 		cb.button_pressed = true
 		_blocks_box.add_child(cb)
 		_block_checks.append({"cb": cb, "id": str(b["id"])})
+	if not shown_any:
+		var none := Label.new()
+		none.text = "실을 문장이 없습니다. 「받은 자료」에서 과거 정보를 끌어올 수 있습니다."
+		none.modulate = Color(0.65, 0.65, 0.6)
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_blocks_box.add_child(none)
 
 func _make_comments(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "댓글")
@@ -579,8 +699,11 @@ func _on_publish() -> void:
 		_show_ending(str(result["ending"]), str(result.get("epilogue", "")))
 	else:
 		_update_turn_label()
-		_refresh_informant()  # 턴 진행 → 이번 턴 새 사실 드립 + 오늘/이월 갱신
-		_refresh_blocks()     # 원고 창 블록도 새 사실 반영(뱃지 포함)
+		_carryover_selected.clear()  # 새 턴 = 새 기사: 지난 기사에 끌어온 과거 정보는 초기화
+		_refresh_informant()  # 이번 턴 오늘 입수 + 받은 자료 개수 갱신
+		_refresh_blocks()     # 원고 창 = 새 턴 오늘 블록
+		if _archive_panel != null and _archive_panel.visible:
+			_refresh_archive()
 
 func _update_turn_label() -> void:
 	if _turn_label != null and _tm != null:
