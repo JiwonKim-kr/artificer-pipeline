@@ -90,8 +90,8 @@
 
   "detection": {
     "_desc": "왜곡 발각. 확률 누적식: 왜곡할수록 riskProb↑, 매 턴 그 확률로 굴림, 걸리면 단발성 충격(크기는 걸린 시점 확률에 비례).",
-    "manipStep": 0.11,
-    "_manipStep": "δ=1 왜곡 기사 1건당 누적 발각확률 증가폭.",
+    "manipStep": 0.09,
+    "_manipStep": "δ=1 왜곡 기사 1건당 누적 발각확률 증가폭. (CB3: 비트시트로 불리 풀 확대 → 0.11→0.09 재튜닝, docs/build/c6_balance.md)",
     "honestDecay": 0.03,
     "_honestDecay": "정직 기사 발행 시 누적확률 소폭 냉각.",
     "contestednessWeight": 0.6,
