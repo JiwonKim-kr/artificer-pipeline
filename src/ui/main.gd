@@ -48,6 +48,8 @@ var _blocks_box: VBoxContainer
 var _desk_search_btn: Button
 var _desk_note: Label
 var _f16_shown: bool = false
+var _informant_body: VBoxContainer  # 정보원 패널 스크롤 본문(턴별 갱신 대상)
+var _informant_title: Label         # 정보원 패널 타이틀(오늘/누적 카운트 표시)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -154,6 +156,7 @@ func _search_desk() -> void:
 	if _tm.discover_theo():
 		clue_found.emit()
 		_refresh_blocks()
+		_refresh_informant()  # F15 단서가 정보원 패널에도 등장
 		_desk_note.text = "책상 CRT 수신함에서 형 테오의 흔적을 찾았다. (원고에 추가됨)"
 		if _desk_search_btn != null:
 			_desk_search_btn.disabled = true
@@ -237,6 +240,7 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 	vb.add_child(t)
 	vb.add_child(HSeparator.new())
 	panel.set_meta("body", vb)
+	panel.set_meta("title_label", t)  # 타이틀 갱신용(예: 정보원 오늘/누적 카운트)
 	return panel
 
 func _body_of(panel: Node) -> VBoxContainer:
@@ -256,22 +260,59 @@ func _scroll_body(parent: VBoxContainer) -> VBoxContainer:
 	return inner
 
 # 정보원: 입수 정보(전부 진실). 유리/불리 태그는 노출하지 않음 — 판단은 플레이어 몫.
+# 턴별 드립: 이번 턴까지 도착한 사실만, 오늘 입수/이월을 구분해 보여준다(_refresh_informant).
 func _make_informant(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "정보원 — 입수 정보")
-	var vb := _scroll_body(_body_of(panel))
+	_informant_title = panel.get_meta("title_label") as Label
+	_informant_body = _scroll_body(_body_of(panel))
+	_refresh_informant()
+	return panel
+
+## 정보원 패널을 현재 턴 기준 '가용 사실'만, 오늘/이월 구분해 다시 그린다.
+## 가용 사실 = get_blocks() 에 등장하는 fact 집합(코어의 단일 턴 게이팅을 UI가 재사용 —
+## hidden F15·gated F16 도 자동 반영). 로직을 UI에 중복하지 않는다.
+func _refresh_informant() -> void:
+	if _informant_body == null:
+		return
+	for c in _informant_body.get_children():
+		_informant_body.remove_child(c)
+		c.free()
 	var facts: Dictionary = _tm.content.get("facts", {})
-	for fid in facts:
-		var f: Dictionary = facts[fid]
+	var cur_turn: int = _tm.model.turn + 1
+	# get_blocks 순서(=facts 삽입 순서) 유지하며 등장 fact 를 중복 없이 수집.
+	var available: Array = []
+	var seen: Dictionary = {}
+	for b in _tm.get_blocks():
+		var fid: String = str(b["fact"])
+		if not seen.has(fid):
+			seen[fid] = true
+			available.append(fid)
+	var today: int = 0
+	for fid in available:
+		var f: Dictionary = facts.get(fid, {})
+		var ft: int = int(f.get("turn", 0))
+		var is_today: bool = ft == cur_turn
+		if is_today:
+			today += 1
+		var badge: String
+		if is_today:
+			badge = "● 오늘 입수"
+		elif ft > 0:
+			badge = "· 이월 T%d" % ft
+		else:
+			badge = "· 단서(책상)"  # F15: 턴 없이 발견으로 등장
 		var head := Label.new()
-		head.text = "· %s" % str(f.get("title", ""))
-		head.add_theme_color_override("font_color", Color(0.6, 0.9, 0.7))
-		vb.add_child(head)
+		head.text = "%s  %s" % [badge, str(f.get("title", ""))]
+		head.add_theme_color_override("font_color",
+			Color(1.0, 0.85, 0.4) if is_today else Color(0.55, 0.72, 0.6))
+		_informant_body.add_child(head)
 		for frag in f.get("fragments", []):
 			var l := Label.new()
 			l.text = "   %s" % str(frag.get("text", ""))
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			vb.add_child(l)
-	return panel
+			_informant_body.add_child(l)
+	if _informant_title != null:
+		_informant_title.text = "▍ 정보원 — 오늘 %d · 누적 %d" % [today, available.size()]
 
 # 원고 작성: 각 문장 블록을 넣을지 말지 토글. 필수 없음. 전부 빼면 미보도.
 func _make_editor(pos: Vector2, size: Vector2) -> Control:
@@ -322,13 +363,19 @@ func _refresh_blocks() -> void:
 		c.free()
 	_block_checks.clear()
 	var facts: Dictionary = _tm.content.get("facts", {})
+	var cur_turn: int = _tm.model.turn + 1
 	var last_fact := ""
 	for b in _tm.get_blocks():
 		if b["fact"] != last_fact:
 			last_fact = str(b["fact"])
+			var fdict: Dictionary = facts.get(last_fact, {})
+			var ft: int = int(fdict.get("turn", 0))
+			var is_today: bool = ft == cur_turn
+			var mark: String = "● " if is_today else ""
 			var fh := Label.new()
-			fh.text = "[%s]" % str((facts.get(last_fact, {}) as Dictionary).get("title", last_fact))
-			fh.add_theme_color_override("font_color", Color(0.55, 0.8, 0.95))
+			fh.text = "%s[%s]" % [mark, str(fdict.get("title", last_fact))]
+			fh.add_theme_color_override("font_color",
+				Color(1.0, 0.85, 0.4) if is_today else Color(0.55, 0.8, 0.95))
 			_blocks_box.add_child(fh)
 		var cb := CheckBox.new()
 		cb.text = str(b["text"])
@@ -421,6 +468,8 @@ func _on_publish() -> void:
 		_show_ending(str(result["ending"]), str(result.get("epilogue", "")))
 	else:
 		_update_turn_label()
+		_refresh_informant()  # 턴 진행 → 이번 턴 새 사실 드립 + 오늘/이월 갱신
+		_refresh_blocks()     # 원고 창 블록도 새 사실 반영(뱃지 포함)
 
 func _update_turn_label() -> void:
 	if _turn_label != null and _tm != null:
