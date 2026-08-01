@@ -50,6 +50,7 @@ var _desk_note: Label
 var _f16_shown: bool = false
 var _informant_body: VBoxContainer  # 정보원 패널 스크롤 본문(턴별 갱신 대상)
 var _informant_title: Label         # 정보원 패널 타이틀(오늘/누적 카운트 표시)
+var _article_box: VBoxContainer     # 발행 기사 카드(헤드라인+본문)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -340,6 +341,10 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	vb.add_child(pub)
 	_pub_button = pub
 
+	# 기사 카드: 발행하면 헤드라인 + 본문(포함 블록)이 조립돼 뜬다(_render_article).
+	_article_box = VBoxContainer.new()
+	vb.add_child(_article_box)
+
 	_status_label = Label.new()
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.5))
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -440,9 +445,11 @@ func _set_needle(macro: float) -> void:
 # ---------- 발행 ----------
 func _on_publish() -> void:
 	var included: Array = []
+	var included_texts: Array = []
 	for entry in _block_checks:
 		if (entry["cb"] as CheckBox).button_pressed:
 			included.append(entry["id"])
+			included_texts.append((entry["cb"] as CheckBox).text)  # 본문 조립용(발행 전 캡처)
 	var det_before: int = _tm.model.detections.size()
 	var result := _tm.publish({"included_ids": included})
 	article_published.emit()
@@ -453,6 +460,7 @@ func _on_publish() -> void:
 	_set_needle(float(snap["tvMacro"]))
 	var swing: float = float(snap["xs"]["sns_swing"])
 	var reported: Array = result["reported_facts"]
+	_render_article(reported, str(result["frame_label"]), included_texts)
 	var report_txt: String = "미보도" if reported.is_empty() else "보도 %d건" % reported.size()
 	_status_label.text = "%s · 논조 %s(δ=%.2f) · 부동층 %d%%" % [
 		report_txt, str(result["frame_label"]), float(result["distortion"]), int(round(swing * 100.0)),
@@ -474,6 +482,52 @@ func _on_publish() -> void:
 func _update_turn_label() -> void:
 	if _turn_label != null and _tm != null:
 		_turn_label.text = "턴 %d / %d" % [_tm.model.turn + 1, _tm.max_turns]
+
+## 발행된 기사를 [헤드라인] + 본문(포함 블록, 최대 6줄)으로 조립해 카드로 보여준다.
+## 헤드라인 = 첫 보도 fact 의 headlines[논조]. 본문 = 플레이어가 실은 문장들(등장 순서).
+func _render_article(reported: Array, frame_label: String, body_lines: Array) -> void:
+	if _article_box == null:
+		return
+	for c in _article_box.get_children():
+		c.queue_free()
+	if reported.is_empty():
+		var none := Label.new()
+		none.text = "(미보도 — 이번 턴 기사를 싣지 않았다)"
+		none.modulate = Color(0.72, 0.72, 0.62)
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_article_box.add_child(none)
+		return
+	var facts: Dictionary = _tm.content.get("facts", {})
+	# 헤드라인: 첫 보도 fact 의 논조별 헤드라인(없으면 아무 논조나, 그래도 없으면 제목).
+	var headline := ""
+	for fid in reported:
+		var hs: Dictionary = (facts.get(fid, {}) as Dictionary).get("headlines", {})
+		if hs.has(frame_label):
+			headline = str(hs[frame_label]); break
+		elif not hs.is_empty():
+			headline = str(hs.values()[0]); break
+	if headline == "":
+		headline = str((facts.get(reported[0], {}) as Dictionary).get("title", ""))
+	var head := Label.new()
+	head.text = "「%s」" % headline
+	head.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5))
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_article_box.add_child(head)
+	var sep := HSeparator.new()
+	_article_box.add_child(sep)
+	# 본문 5~6줄(초과분은 …외 N줄).
+	var shown: int = mini(body_lines.size(), 6)
+	for i in shown:
+		var l := Label.new()
+		l.text = "  " + str(body_lines[i])
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_color_override("font_color", Color(0.85, 0.88, 0.8))
+		_article_box.add_child(l)
+	if body_lines.size() > shown:
+		var more := Label.new()
+		more.text = "  …외 %d줄" % (body_lines.size() - shown)
+		more.modulate = Color(0.6, 0.6, 0.55)
+		_article_box.add_child(more)
 
 func _show_ending(ending: String, epi: String = "") -> void:
 	ending_reached.emit()
