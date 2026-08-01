@@ -4,8 +4,9 @@ extends Control
 ## 원고 작성 = 문장 블록 취사(넣을지 말지). 유리/불리는 노출하지 않음(플레이어 판단).
 ## 로직은 TurnManager(코어)에 위임. 마우스/클릭 전용. spec: docs/specs/turn_loop_vertical_slice.md
 
-const DESK_BG := "res://assets/art/ui/main/PLACEHOLDER_desk_bg.png"
-const GAUGE_TEX := "res://assets/art/ui/gauge/PLACEHOLDER_opinion_needle.png"
+const DESK_BG := "res://assets/art/ui/main/desk_bg.png"
+const GAUGE_TEX := "res://assets/art/ui/gauge/opinion_needle.png"
+const WINDOW_FRAME := "res://assets/art/ui/window/frame.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
 
 const ENDINGS := {
@@ -186,6 +187,21 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 	panel.position = pos
 	panel.custom_minimum_size = size
 	panel.size = size
+	# 창 크롬: 브라스 프레임 텍스처를 9-slice(StyleBoxTexture)로 늘린다.
+	# 텍스처 512² 중 테두리 약 96px 이 장식부라 그만큼 마진으로 잡아 모서리를 보존한다.
+	var frame_tex := _res(WINDOW_FRAME)
+	if frame_tex is Texture2D:
+		var sb := StyleBoxTexture.new()
+		sb.texture = frame_tex
+		# 9-slice 마진: 창이 340px 대인데 96(텍스처 장식 실폭)을 쓰면 모서리만으로
+		# 폭을 다 먹어 본문이 넘친다. 44 로 줄여 테두리 질감만 살린다.
+		sb.set_texture_margin_all(44.0)
+		# 본문은 테두리 안쪽으로. 상단은 프레임 타이틀바 장식을 피해 더 크게 잡는다.
+		sb.content_margin_left = 30.0
+		sb.content_margin_right = 30.0
+		sb.content_margin_top = 46.0
+		sb.content_margin_bottom = 26.0
+		panel.add_theme_stylebox_override("panel", sb)
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
 	var t := Label.new()
