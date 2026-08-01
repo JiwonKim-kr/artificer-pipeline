@@ -227,11 +227,12 @@ func _window(pos: Vector2, size: Vector2, title: String) -> PanelContainer:
 		# 9-slice 마진: 창이 340px 대인데 96(텍스처 장식 실폭)을 쓰면 모서리만으로
 		# 폭을 다 먹어 본문이 넘친다. 44 로 줄여 테두리 질감만 살린다.
 		sb.set_texture_margin_all(44.0)
-		# 본문은 테두리 안쪽으로. 상단은 프레임 타이틀바 장식을 피해 더 크게 잡는다.
-		sb.content_margin_left = 30.0
-		sb.content_margin_right = 30.0
-		sb.content_margin_top = 54.0   # 프레임 타이틀바 장식 아래로 본문을 내린다
-		sb.content_margin_bottom = 28.0
+		# 본문은 테두리 안쪽으로. 브라스 장식이 좌우 ~44px 라 본문 여백을 그만큼 줘야
+		# 글자가 테두리 밑으로 삐져나가지 않는다(9-slice 마진과 맞춘다).
+		sb.content_margin_left = 44.0
+		sb.content_margin_right = 44.0
+		sb.content_margin_top = 56.0   # 프레임 타이틀바 장식 아래로 본문을 내린다
+		sb.content_margin_bottom = 38.0
 		panel.add_theme_stylebox_override("panel", sb)
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
@@ -390,7 +391,7 @@ func _refresh_blocks() -> void:
 
 func _make_comments(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "댓글")
-	_comments_box = _body_of(panel)
+	_comments_box = _scroll_body(_body_of(panel))  # 댓글이 많아도 스크롤로 접근(삐짐 방지)
 	var hint := Label.new()
 	hint.text = "발행하면 여론 반응이 달립니다."
 	hint.modulate = Color(0.7, 0.7, 0.7)

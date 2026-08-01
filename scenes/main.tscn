@@ -29,27 +29,32 @@ script = ExtResource("2_se_emitter")
 stream = ExtResource("3_se_stream")
 target_path = NodePath("..")
 signal_name = &"monitor_powered"
+volume_db = -8.0
 
 [node name="SeUiPublish" type="AudioStreamPlayer" parent="."]
 script = ExtResource("4_se_emitter")
 stream = ExtResource("5_se_stream")
 target_path = NodePath("..")
 signal_name = &"article_published"
+volume_db = -8.0
 
 [node name="SeUiDetected" type="AudioStreamPlayer" parent="."]
 script = ExtResource("6_se_emitter")
 stream = ExtResource("7_se_stream")
 target_path = NodePath("..")
 signal_name = &"distortion_detected"
+volume_db = -8.0
 
 [node name="SeUiEnding" type="AudioStreamPlayer" parent="."]
 script = ExtResource("8_se_emitter")
 stream = ExtResource("9_se_stream")
 target_path = NodePath("..")
 signal_name = &"ending_reached"
+volume_db = -8.0
 
 [node name="SeUiClueFound" type="AudioStreamPlayer" parent="."]
 script = ExtResource("10_se_emitter")
 stream = ExtResource("11_se_stream")
 target_path = NodePath("..")
 signal_name = &"clue_found"
+volume_db = -8.0
