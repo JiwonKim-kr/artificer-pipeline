@@ -105,6 +105,17 @@ func _enter_screen() -> void:
 	_desk.visible = false
 	_screen.visible = true
 
+func _exit_screen() -> void:
+	_screen.visible = false
+	_desk.visible = true
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_ESCAPE:
+		if _screen != null and _screen.visible:
+			_exit_screen()
+		elif _desk != null and _desk.visible:
+			_enter_screen()
+
 func _search_desk() -> void:
 	if _tm.discover_theo():
 		_refresh_blocks()
@@ -131,10 +142,17 @@ func _build_screen() -> void:
 	os.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_screen.add_child(os)
 	_os = os
-	os.add_child(_make_informant(Vector2(20, 20), Vector2(340, 320)))
-	os.add_child(_make_editor(Vector2(376, 20), Vector2(430, 540)))
-	os.add_child(_make_comments(Vector2(822, 20), Vector2(310, 400)))
-	os.add_child(_make_gauge(Vector2(20, 356), Vector2(340, 272)))
+	os.add_child(_make_informant(Vector2(20, 48), Vector2(340, 320)))
+	os.add_child(_make_editor(Vector2(376, 48), Vector2(430, 540)))
+	os.add_child(_make_comments(Vector2(822, 48), Vector2(310, 400)))
+	os.add_child(_make_gauge(Vector2(20, 376), Vector2(340, 268)))
+	var back := Button.new()
+	back.name = "BackButton"
+	back.text = "← 데스크 (Esc)"
+	back.position = Vector2(12, 10)
+	back.custom_minimum_size = Vector2(150, 30)
+	back.pressed.connect(_exit_screen)
+	os.add_child(back)
 
 	var bbc := BackBufferCopy.new()
 	bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
