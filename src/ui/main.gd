@@ -10,6 +10,16 @@ const WINDOW_FRAME := "res://assets/art/ui/window/frame.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
 const SETTINGS_PATH := "user://settings.cfg"  # 사운드 볼륨 등 사용자 설정 저장
 
+## 댓글 작성자 핸들 풀 — 세그먼트 페르소나(설계 §4·§5)에 맞춘 디젤펑크 톤.
+## 렌더 시 랜덤 선택 + 숫자 접미로 변주해 "고정 몇 개" 느낌을 없앤다(표시 전용, 게임 상태 무관).
+const HANDLE_POOLS := {
+	"sns_against": ["강철형제단", "짤린주조공", "무쇠팔", "톱니밥줄", "해고통보", "녹슨망치", "파업중", "치차노동자", "분노의용접공", "공돌이출신", "빼앗긴자"],
+	"old_for": ["치차상공회", "근대화지지", "질서제일", "산업보국", "중산층가장", "진보의증인", "공장주협회", "석간구독자", "합리적시민", "애국시민", "노신사"],
+	"sns_swing": ["톱니공", "치차뉴비", "퇴근길시민", "스크롤중", "판단보류", "도시청년", "중립기어", "카페인중독", "그냥시민", "고민중", "어제까진반대"],
+	"apathetic": ["월급인상요망", "관심없음", "밥먼저", "퇴근하고싶다", "그런갑다", "출근싫어", "핸드폰만봄", "눈팅중", "무념무상", "지나가던1인"],
+}
+const HANDLE_FALLBACK := ["치차시민", "익명", "이름없음"]
+
 const ENDINGS := {
 	"성공": "표결일. 부동층이 찬성으로 돌아섰다. 「노동 근대화법」은 통과됐다.",
 	"실패": "표결일. 끝내 여론을 돌리지 못했다. 법안은 보류됐다.",
@@ -787,6 +797,16 @@ func _show_ending(ending: String, epi: String = "") -> void:
 	if _os != null:
 		_os.add_child(panel)
 
+## 세그먼트 페르소나에 맞는 랜덤 핸들. 같은 base 도 숫자 접미(약 70%)로 변주.
+func _comment_handle(seg: String) -> String:
+	var pool: Array = HANDLE_POOLS.get(seg, HANDLE_FALLBACK)
+	if pool.is_empty():
+		pool = HANDLE_FALLBACK
+	var base: String = str(pool[randi() % pool.size()])
+	if randf() < 0.7:
+		base += str(randi() % 89 + 11)  # 11~99
+	return "@" + base
+
 func _render_comments(comments: Array) -> void:
 	for c in _comments_box.get_children():
 		c.queue_free()
@@ -797,7 +817,16 @@ func _render_comments(comments: Array) -> void:
 		_comments_box.add_child(none)
 		return
 	for c in comments:
-		var l := Label.new()
-		l.text = "[%s] %s" % [str(c.get("seg", "")), str(c.get("text", ""))]
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		_comments_box.add_child(l)
+		var row := VBoxContainer.new()
+		var handle := Label.new()
+		handle.text = _comment_handle(str(c.get("seg", "")))
+		handle.add_theme_color_override("font_color", Color(0.62, 0.78, 0.95))
+		row.add_child(handle)
+		var body := Label.new()
+		body.text = str(c.get("text", ""))
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(body)
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(0, 6)
+		row.add_child(spacer)
+		_comments_box.add_child(row)
