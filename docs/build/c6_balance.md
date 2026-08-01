@@ -67,3 +67,25 @@ node sim/opinion-model/balance_montecarlo.mjs
 - `opinion_config.json` 을 바꾸면 `node pipeline/tests/dump_opinion_golden.mjs` 로 골든 재생성 후
   parity 재확인(이번 변경은 mission 필드라 골든 불변 확인됨).
 - `RUIN_AT` 상수는 `turn_manager.DETECT_BREAK` 와 일치시켜 유지한다.
+
+---
+
+## CB3 재밸런싱 — 8턴 비트시트 반영 (2026-07-31)
+
+CB2에서 F1~F16 + 턴별 노출(비트시트)이 붙어 불리 풀이 급증(턴1→8: **2 7 11 14 17 19 19 19**).
+기존 `balance_montecarlo`는 고정 풀(F1/F2/F7 상시) 기준이라 stale → **턴별 누적 풀**로 재작성
+(`poolAt`, get_blocks 미러). 재측정 시 manipStep 0.11에선 최적선조차 47%로 뻑뻑 → 스윕 재튜닝.
+
+**확정: `detection.manipStep` 0.11 → 0.09** (골든 재생성·parity 재확인 완료. maxTurns=8·임계3 유지).
+
+| 전략 | 성공% | 발각파탄% | 실패% |
+|---|---|---|---|
+| 정직(전부공개) | 0.0 | 0.0 | 100 |
+| 은폐1(최소) | 46.9 | 1.4 | 51.6 |
+| 은폐2(중간) | 60.4 | 15.8 | 23.8 |
+| 은폐전부(δ=1) | 35.2 | 29.9 | 35.0 |
+| **최적(캡유지 최소은폐)** | **75.9** | 10.1 | 14.1 |
+
+- 곡선 의도 복원: 정직=구조적 불가, **최적선 ~76%**(구 c6 목표치), 과욕(은폐전부)=파탄 지배, 게으름(은폐1)=시간초과.
+- manipStep 스윕(N=4000, 최적선): 0.11→47 / **0.09→76** / 0.08→89(너무 쉬움) / 0.07↓ 과욕도 승리.
+- ⚠️ `balance_montecarlo.mjs`는 이제 비트시트 인지(`poolAt`). config 변경 시 `dump_opinion_golden.mjs`로 골든 재생성 필수.

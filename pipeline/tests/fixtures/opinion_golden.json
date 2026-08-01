@@ -27,56 +27,56 @@
   "distort_seed1": [
     {
       "turn": 1,
-      "riskProb": 0.11,
+      "riskProb": 0.09,
       "swing": 0.5361935483870968,
       "detection": null
     },
     {
       "turn": 2,
       "riskProb": 0,
-      "swing": 0.4726416493236211,
+      "swing": 0.4918916493236211,
       "detection": {
-        "damage": 0.12100000000000001,
-        "riskAtCatch": 0.22
+        "damage": 0.099,
+        "riskAtCatch": 0.18
       }
     },
     {
       "turn": 3,
-      "riskProb": 0.11,
-      "swing": 0.4996730743764894,
+      "riskProb": 0.09,
+      "swing": 0.5215497679248765,
       "detection": null
     },
     {
       "turn": 4,
-      "riskProb": 0.22,
-      "swing": 0.5321990727603783,
+      "riskProb": 0.18,
+      "swing": 0.5573008143576729,
       "detection": null
     },
     {
       "turn": 5,
-      "riskProb": 0.33,
-      "swing": 0.5716828613814575,
+      "riskProb": 0.27,
+      "swing": 0.6007603949543237,
       "detection": null
     },
     {
       "turn": 6,
       "riskProb": 0,
-      "swing": 0.40826624919605925,
+      "swing": 0.4807682037772333,
       "detection": {
-        "damage": 0.24200000000000002,
-        "riskAtCatch": 0.44
+        "damage": 0.198,
+        "riskAtCatch": 0.36
       }
     },
     {
       "turn": 7,
-      "riskProb": 0.11,
-      "swing": 0.4265135470702312,
+      "riskProb": 0.09,
+      "swing": 0.5089085102926428,
       "detection": null
     },
     {
       "turn": 8,
-      "riskProb": 0.22,
-      "swing": 0.44825441513832653,
+      "riskProb": 0.18,
+      "swing": 0.5427959906809453,
       "detection": null
     }
   ]
