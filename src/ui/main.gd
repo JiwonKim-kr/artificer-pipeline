@@ -8,6 +8,7 @@ const DESK_BG := "res://assets/art/ui/main/desk_bg.png"
 const GAUGE_TEX := "res://assets/art/ui/gauge/opinion_needle.png"
 const WINDOW_FRAME := "res://assets/art/ui/window/frame.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
+const SETTINGS_PATH := "user://settings.cfg"  # 사운드 볼륨 등 사용자 설정 저장
 
 const ENDINGS := {
 	"성공": "표결일. 부동층이 찬성으로 돌아섰다. 「노동 근대화법」은 통과됐다.",
@@ -51,10 +52,14 @@ var _f16_shown: bool = false
 var _informant_body: VBoxContainer  # 정보원 패널 스크롤 본문(턴별 갱신 대상)
 var _informant_title: Label         # 정보원 패널 타이틀(오늘/누적 카운트 표시)
 var _article_box: VBoxContainer     # 발행 기사 카드(헤드라인+본문)
+var _settings_panel: PanelContainer # 소리 설정 오버레이
+var _se_vol: float = 0.4            # 효과음 볼륨(0~1, 기본 ≈ -8dB)
+var _bgm_vol: float = 0.5           # 배경음 볼륨(0~1, BGM 추가 대비)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_apply_font()
+	_load_audio_settings()  # 저장된 볼륨을 SE/BGM 버스에 적용(버스는 default_bus_layout.tres)
 	_tm = TurnManager.new(1)
 	_build_desk()
 	_build_screen()
@@ -153,6 +158,92 @@ func _input(event: InputEvent) -> void:
 		elif _desk != null and _desk.visible:
 			_enter_screen()
 
+# ---------- 소리 설정 ----------
+func _build_settings_panel(parent: Control) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "SettingsPanel"
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(360, 0)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.10, 0.08, 0.96)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.7, 0.55, 0.25)
+	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(18)
+	panel.add_theme_stylebox_override("panel", sb)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+	var title := Label.new()
+	title.text = "▍ 소리 설정"
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
+	vb.add_child(title)
+	vb.add_child(HSeparator.new())
+	vb.add_child(_volume_row("효과음", "SE", _se_vol))
+	vb.add_child(_volume_row("배경음", "BGM", _bgm_vol))
+	var close := Button.new()
+	close.text = "닫기"
+	close.pressed.connect(func() -> void: panel.visible = false)
+	vb.add_child(close)
+	panel.visible = false
+	parent.add_child(panel)
+	_settings_panel = panel
+
+## 볼륨 슬라이더 한 줄(라벨 + 백분율 + HSlider). 값이 바뀌면 버스에 즉시 반영·저장.
+func _volume_row(label_text: String, bus_name: String, init_val: float) -> Control:
+	var row := VBoxContainer.new()
+	var head := Label.new()
+	head.text = "%s  %d%%" % [label_text, int(round(init_val * 100.0))]
+	row.add_child(head)
+	var s := HSlider.new()
+	s.min_value = 0.0
+	s.max_value = 1.0
+	s.step = 0.01
+	s.value = init_val
+	s.custom_minimum_size = Vector2(300, 22)
+	s.value_changed.connect(func(v: float) -> void:
+		head.text = "%s  %d%%" % [label_text, int(round(v * 100.0))]
+		_on_vol_changed(bus_name, v))
+	row.add_child(s)
+	return row
+
+func _toggle_settings() -> void:
+	if _settings_panel != null:
+		_settings_panel.visible = not _settings_panel.visible
+		if _settings_panel.visible:
+			_settings_panel.move_to_front()
+
+func _on_vol_changed(bus_name: String, v: float) -> void:
+	if bus_name == "SE":
+		_se_vol = v
+	else:
+		_bgm_vol = v
+	_apply_bus_vol(bus_name, v)
+	_save_audio_settings()
+
+## 0~1 볼륨을 버스에 적용(0 근처면 뮤트). 버스가 없으면 조용히 무시.
+func _apply_bus_vol(bus_name: String, v: float) -> void:
+	var idx: int = AudioServer.get_bus_index(bus_name)
+	if idx < 0:
+		return
+	AudioServer.set_bus_mute(idx, v <= 0.005)
+	AudioServer.set_bus_volume_db(idx, linear_to_db(maxf(v, 0.0001)))
+
+func _load_audio_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS_PATH) == OK:
+		_se_vol = float(cfg.get_value("audio", "se", _se_vol))
+		_bgm_vol = float(cfg.get_value("audio", "bgm", _bgm_vol))
+	_apply_bus_vol("SE", _se_vol)
+	_apply_bus_vol("BGM", _bgm_vol)
+
+func _save_audio_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(SETTINGS_PATH)  # 다른 섹션 보존
+	cfg.set_value("audio", "se", _se_vol)
+	cfg.set_value("audio", "bgm", _bgm_vol)
+	cfg.save(SETTINGS_PATH)
+
 func _search_desk() -> void:
 	if _tm.discover_theo():
 		clue_found.emit()
@@ -194,6 +285,14 @@ func _build_screen() -> void:
 	back.custom_minimum_size = Vector2(150, 30)
 	back.pressed.connect(_exit_screen)
 	os.add_child(back)
+	var settings_btn := Button.new()
+	settings_btn.name = "SettingsButton"
+	settings_btn.text = "소리 설정"
+	settings_btn.position = Vector2(1002, 10)
+	settings_btn.custom_minimum_size = Vector2(130, 30)
+	settings_btn.pressed.connect(_toggle_settings)
+	os.add_child(settings_btn)
+	_build_settings_panel(os)
 
 	var bbc := BackBufferCopy.new()
 	bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
