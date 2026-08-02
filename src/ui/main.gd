@@ -20,6 +20,23 @@ const HANDLE_POOLS := {
 }
 const HANDLE_FALLBACK := ["치차시민", "익명", "이름없음"]
 
+## 댓글 슬롯 치환값 — 댓글의 topic 기준으로 {키워드}/{대상}/{수치}/{집단}을 채운다
+## (설계 댓글뱅크_설계_v0.1 §4). 댓글이 그 주제로 쓰였으므로 topic 기준이 안전하다.
+const COMMENT_SLOTS := {
+	"생산성": {"수치": "42%", "대상": "모르겐", "키워드": "생산성 42%"},
+	"안전": {"수치": "인명사고 0건", "대상": "모르겐", "키워드": "인명사고 제로"},
+	"신직종": {"수치": "1,900명", "대상": "재교육원", "키워드": "재교육"},
+	"경쟁": {"대상": "노르덴", "키워드": "노르덴 양산"},
+	"실업": {"수치": "6,300", "대상": "회사", "키워드": "대량 해고"},
+	"임금": {"수치": "30%", "대상": "회사", "키워드": "임금 삭감"},
+	"인격": {"대상": "모르겐", "키워드": "일곱이"},
+	"무력충돌": {"대상": "강철 손", "키워드": "공장 앞 충돌"},
+	"유착": {"대상": "소여 위원장", "키워드": "발의자 유착"},
+	"비공개": {"대상": "모르겐", "키워드": "감사 거부"},
+}
+## topic 에 값이 없을 때(또는 topic=null)의 최후 대체값 — 문장이 어색하지 않게.
+const SLOT_FALLBACK := {"키워드": "이번 기사", "대상": "회사", "수치": "그 숫자", "집단": "저쪽 사람들"}
+
 const ENDINGS := {
 	"성공": "표결일. 부동층이 찬성으로 돌아섰다. 「노동 근대화법」은 통과됐다.",
 	"실패": "표결일. 끝내 여론을 돌리지 못했다. 법안은 보류됐다.",
@@ -807,6 +824,19 @@ func _comment_handle(seg: String) -> String:
 		base += str(randi() % 89 + 11)  # 11~99
 	return "@" + base
 
+## 댓글 텍스트의 {슬롯}을 topic 기준으로 채운다. 값이 없으면 SLOT_FALLBACK 으로
+## 대체해 "{대상}" 같은 리터럴이 화면에 노출되지 않게 한다.
+func _fill_slots(text: String, topic_v: Variant) -> String:
+	if not text.contains("{"):
+		return text
+	var topic: String = "" if topic_v == null else str(topic_v)
+	var m: Dictionary = COMMENT_SLOTS.get(topic, {})
+	for key in ["키워드", "대상", "수치", "집단"]:
+		if text.contains("{" + key + "}"):
+			var val: String = str(m.get(key, SLOT_FALLBACK.get(key, "")))
+			text = text.replace("{" + key + "}", val)
+	return text
+
 func _render_comments(comments: Array) -> void:
 	for c in _comments_box.get_children():
 		c.queue_free()
@@ -823,7 +853,7 @@ func _render_comments(comments: Array) -> void:
 		handle.add_theme_color_override("font_color", Color(0.62, 0.78, 0.95))
 		row.add_child(handle)
 		var body := Label.new()
-		body.text = str(c.get("text", ""))
+		body.text = _fill_slots(str(c.get("text", "")), c.get("topic"))
 		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_child(body)
 		var spacer := Control.new()
