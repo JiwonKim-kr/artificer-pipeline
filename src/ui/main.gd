@@ -78,7 +78,14 @@ var _desk_note: Label
 var _f16_shown: bool = false
 var _informant_body: VBoxContainer  # 정보원 패널 스크롤 본문(턴별 갱신 대상)
 var _informant_title: Label         # 정보원 패널 타이틀(오늘/누적 카운트 표시)
-var _article_box: VBoxContainer     # 발행 기사 카드(헤드라인+본문)
+var _article_box: VBoxContainer     # 발행 기사 오버레이의 스크롤 본문(헤드라인+본문)
+var _article_panel: PanelContainer  # 발행 기사 오버레이(발행 시 크게 출력·X 닫기)
+var _article_view_btn: Button       # 원고 창의 "기사 다시 보기" 버튼
+var _article_history: Array = []     # 발행된 기사 기록 [{reported, frame, body, turn}] — < > 로 탐색
+var _article_idx: int = -1           # 현재 보고 있는 기사 인덱스
+var _article_nav_label: Label        # 오버레이의 "T3 · 2/5" 표시
+var _article_prev_btn: Button
+var _article_next_btn: Button
 var _settings_panel: PanelContainer # 소리 설정 오버레이
 var _se_vol: float = 0.4            # 효과음 볼륨(0~1, 기본 ≈ -8dB)
 var _bgm_vol: float = 0.5           # 배경음 볼륨(0~1, BGM 추가 대비)
@@ -194,6 +201,8 @@ func _build_settings_panel(parent: Control) -> void:
 	var panel := PanelContainer.new()
 	panel.name = "SettingsPanel"
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH  # 중심에서 대칭으로 자라 정중앙에 오게
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	panel.custom_minimum_size = Vector2(360, 0)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.08, 0.10, 0.08, 0.96)
@@ -280,6 +289,8 @@ func _build_archive_panel(parent: Control) -> void:
 	var panel := PanelContainer.new()
 	panel.name = "ArchivePanel"
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH  # 중심에서 대칭으로 자라 정중앙에 오게
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	panel.custom_minimum_size = Vector2(560, 460)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.07, 0.09, 0.07, 0.97)
@@ -409,6 +420,7 @@ func _build_screen() -> void:
 	os.add_child(settings_btn)
 	_build_settings_panel(os)
 	_build_archive_panel(os)
+	_build_article_panel(os)
 
 	var bbc := BackBufferCopy.new()
 	bbc.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
@@ -579,9 +591,12 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	vb.add_child(pub)
 	_pub_button = pub
 
-	# 기사 카드: 발행하면 헤드라인 + 본문(포함 블록)이 조립돼 뜬다(_render_article).
-	_article_box = VBoxContainer.new()
-	vb.add_child(_article_box)
+	# 발행된 기사는 오버레이로 크게 뜬다(원고 창 UI 를 가리지 않게). 여기선 다시 보기 버튼만.
+	_article_view_btn = Button.new()
+	_article_view_btn.text = "발행 기사 다시 보기"
+	_article_view_btn.disabled = true
+	_article_view_btn.pressed.connect(_show_article)
+	vb.add_child(_article_view_btn)
 
 	_status_label = Label.new()
 	_status_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.5))
@@ -700,6 +715,7 @@ func _on_publish() -> void:
 		if (entry["cb"] as CheckBox).button_pressed:
 			included.append(entry["id"])
 			included_texts.append((entry["cb"] as CheckBox).text)  # 본문 조립용(발행 전 캡처)
+	var pub_turn: int = _tm.model.turn + 1  # 발행 대상 턴(publish 가 턴을 올리기 전)
 	var det_before: int = _tm.model.detections.size()
 	var result := _tm.publish({"included_ids": included})
 	article_published.emit()
@@ -710,7 +726,15 @@ func _on_publish() -> void:
 	_set_needle(float(snap["tvMacro"]))
 	var swing: float = float(snap["xs"]["sns_swing"])
 	var reported: Array = result["reported_facts"]
-	_render_article(reported, str(result["frame_label"]), included_texts)
+	if not reported.is_empty():
+		_article_history.append({
+			"reported": reported, "frame": str(result["frame_label"]),
+			"body": included_texts, "turn": pub_turn})
+		_article_idx = _article_history.size() - 1  # 새 기사를 현재로
+		_article_view_btn.disabled = false
+		_refresh_article_view()
+		if not bool(result["over"]):
+			_show_article()  # 완성 기사 자동 출력(엔딩 턴은 엔딩 오버레이 우선)
 	var report_txt: String = "미보도" if reported.is_empty() else "보도 %d건" % reported.size()
 	_status_label.text = "%s · 논조 %s(δ=%.2f) · 부동층 %d%%" % [
 		report_txt, str(result["frame_label"]), float(result["distortion"]), int(round(swing * 100.0)),
@@ -738,6 +762,90 @@ func _update_turn_label() -> void:
 
 ## 발행된 기사를 [헤드라인] + 본문(포함 블록, 최대 6줄)으로 조립해 카드로 보여준다.
 ## 헤드라인 = 첫 보도 fact 의 headlines[논조]. 본문 = 플레이어가 실은 문장들(등장 순서).
+# ---------- 발행 기사 오버레이 ----------
+func _build_article_panel(parent: Control) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "ArticlePanel"
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH  # 중심에서 대칭으로 자라 정중앙에 오게
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	panel.custom_minimum_size = Vector2(620, 440)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.09, 0.08, 0.06, 0.98)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(0.82, 0.62, 0.28)
+	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(18)
+	panel.add_theme_stylebox_override("panel", sb)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	panel.add_child(vb)
+	var top := HBoxContainer.new()
+	var title := Label.new()
+	title.text = "▍ 발행된 기사"
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+	_article_prev_btn = Button.new()
+	_article_prev_btn.text = " < "
+	_article_prev_btn.pressed.connect(_article_prev)
+	top.add_child(_article_prev_btn)
+	_article_nav_label = Label.new()
+	_article_nav_label.custom_minimum_size = Vector2(76, 0)
+	_article_nav_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_article_nav_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.75))
+	top.add_child(_article_nav_label)
+	_article_next_btn = Button.new()
+	_article_next_btn.text = " > "
+	_article_next_btn.pressed.connect(_article_next)
+	top.add_child(_article_next_btn)
+	var x := Button.new()
+	x.text = " X "
+	x.custom_minimum_size = Vector2(34, 30)
+	x.pressed.connect(func() -> void: panel.visible = false)
+	top.add_child(x)
+	vb.add_child(top)
+	vb.add_child(HSeparator.new())
+	_article_box = _scroll_body(vb)  # 기사가 길어도 스크롤로 접근
+	panel.visible = false
+	parent.add_child(panel)
+	_article_panel = panel
+
+## 현재 인덱스의 기사를 다시 그리고 < > · 카운터 상태를 갱신한다.
+func _refresh_article_view() -> void:
+	if _article_idx < 0 or _article_idx >= _article_history.size():
+		return
+	var e: Dictionary = _article_history[_article_idx]
+	_render_article(e["reported"], str(e["frame"]), e["body"])
+	if _article_nav_label != null:
+		_article_nav_label.text = "T%d · %d/%d" % [int(e["turn"]), _article_idx + 1, _article_history.size()]
+	if _article_prev_btn != null:
+		_article_prev_btn.disabled = _article_idx <= 0
+	if _article_next_btn != null:
+		_article_next_btn.disabled = _article_idx >= _article_history.size() - 1
+
+func _article_prev() -> void:
+	if _article_idx > 0:
+		_article_idx -= 1
+		_refresh_article_view()
+
+func _article_next() -> void:
+	if _article_idx < _article_history.size() - 1:
+		_article_idx += 1
+		_refresh_article_view()
+
+## 발행 기사 오버레이를 연다(발행 자동 + "다시 보기" 버튼). 현재 인덱스 기사를 보여준다.
+func _show_article() -> void:
+	if _article_panel != null:
+		_refresh_article_view()
+		_article_panel.visible = true
+		_article_panel.move_to_front()
+
+## prose 문단의 첫 문장만 뽑는다(보조 사실 요약용). "다." 로 끝나는 첫 문장 기준.
+func _first_sentence(s: String) -> String:
+	var idx: int = s.find("다.")
+	return s.substr(0, idx + 2) if idx >= 0 else s
+
 func _render_article(reported: Array, frame_label: String, body_lines: Array) -> void:
 	if _article_box == null:
 		return
@@ -751,36 +859,55 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 		_article_box.add_child(none)
 		return
 	var facts: Dictionary = _tm.content.get("facts", {})
-	# 헤드라인: 첫 보도 fact 의 논조별 헤드라인(없으면 아무 논조나, 그래도 없으면 제목).
-	var headline := ""
+	# 대표(리드) 사실 = 프레임 헤드라인을 가진 첫 보도 사실.
+	var lead_fid := str(reported[0])
 	for fid in reported:
-		var hs: Dictionary = (facts.get(fid, {}) as Dictionary).get("headlines", {})
-		if hs.has(frame_label):
-			headline = str(hs[frame_label]); break
-		elif not hs.is_empty():
-			headline = str(hs.values()[0]); break
-	if headline == "":
-		headline = str((facts.get(reported[0], {}) as Dictionary).get("title", ""))
+		if ((facts.get(fid, {}) as Dictionary).get("headlines", {}) as Dictionary).has(frame_label):
+			lead_fid = str(fid); break
+	var lf: Dictionary = facts.get(lead_fid, {})
+	var lhs: Dictionary = lf.get("headlines", {})
+	var headline: String = str(lhs[frame_label]) if lhs.has(frame_label) else str(lf.get("title", ""))
 	var head := Label.new()
 	head.text = "「%s」" % headline
 	head.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5))
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_article_box.add_child(head)
-	var sep := HSeparator.new()
-	_article_box.add_child(sep)
-	# 본문 5~6줄(초과분은 …외 N줄).
-	var shown: int = mini(body_lines.size(), 6)
-	for i in shown:
-		var l := Label.new()
-		l.text = "  " + str(body_lines[i])
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.add_theme_color_override("font_color", Color(0.85, 0.88, 0.8))
-		_article_box.add_child(l)
-	if body_lines.size() > shown:
-		var more := Label.new()
-		more.text = "  …외 %d줄" % (body_lines.size() - shown)
-		more.modulate = Color(0.6, 0.6, 0.55)
-		_article_box.add_child(more)
+	_article_box.add_child(HSeparator.new())
+	# 본문: 리드 사실의 프레임별 prose 문단 + 보조 사실 한 줄(최대 3). prose 없으면 블록 나열 폴백.
+	var lbodies: Dictionary = lf.get("bodies", {})
+	if lbodies.has(frame_label):
+		var lead := Label.new()
+		lead.text = str(lbodies[frame_label])
+		lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lead.add_theme_color_override("font_color", Color(0.88, 0.9, 0.82))
+		_article_box.add_child(lead)
+		var support := 0
+		for fid in reported:
+			if support >= 3:
+				break
+			if str(fid) == lead_fid:
+				continue
+			var fb: Dictionary = (facts.get(fid, {}) as Dictionary).get("bodies", {})
+			if fb.has(frame_label):
+				var sl := Label.new()
+				sl.text = "— " + _first_sentence(str(fb[frame_label]))
+				sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				sl.add_theme_color_override("font_color", Color(0.72, 0.76, 0.7))
+				_article_box.add_child(sl)
+				support += 1
+	else:
+		var shown: int = mini(body_lines.size(), 6)
+		for i in shown:
+			var l := Label.new()
+			l.text = "  " + str(body_lines[i])
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.add_theme_color_override("font_color", Color(0.85, 0.88, 0.8))
+			_article_box.add_child(l)
+		if body_lines.size() > shown:
+			var more := Label.new()
+			more.text = "  …외 %d줄" % (body_lines.size() - shown)
+			more.modulate = Color(0.6, 0.6, 0.55)
+			_article_box.add_child(more)
 
 func _show_ending(ending: String, epi: String = "") -> void:
 	ending_reached.emit()
@@ -789,6 +916,8 @@ func _show_ending(ending: String, epi: String = "") -> void:
 	var panel := PanelContainer.new()
 	panel.name = "EndingOverlay"
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH  # 중심에서 대칭으로 자라 정중앙에 오게
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	panel.custom_minimum_size = Vector2(660, 200)
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
