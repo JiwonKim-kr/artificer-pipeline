@@ -1,59 +1,58 @@
-# 「태엽 인간」 인수인계 — 2026-08-02 (재설계 P1~P3 + 사운드 + 댓글 리얼리티)
+# 「태엽 인간」 인수인계 — 2026-08-02 (역할 분담: 개발=작성자 / 제출용 기술 문서=팀원)
 
-> 대상: 이어서 작업할 팀원. 기준 브랜치 `game/gireki-sim` (origin 반영 완료, HEAD = 병합 `20ce953`).
-> 구조·확장은 [gireki_dev_guide.md](gireki_dev_guide.md), 제출 체크리스트는 [playtest_checklist.md](playtest_checklist.md), 재설계 명세는 [../specs/redesign_v0.4.md](../specs/redesign_v0.4.md) 참고.
-> 이 문서 = "이번에 뭘 했고 / 왜 구조가 바뀌었고 / 다음에 뭐가 남았는지".
-
----
-
-## 1. 이번에 본체(`game/gireki-sim`)에 들어간 것 — 전부 push 완료
-
-**아트 (JiwonKim, 이미 병합됨)**: 디젤펑크 컨셉→lock→gen→reskin(desk_bg·window frame·게이지) + CRT 레이아웃 수정 5건.
-
-**사운드**
-- 효과음 5종(jsfxr 절차생성): monitor_on·publish(타자기)·detected(발각)·ending·clue_found. `se_emitter` 브리지가 시그널 구독(코어 무지). 재현 spec `pipeline/se_specs/`.
-- **SE/BGM 오디오 버스**(`default_bus_layout.tres`) + CRT OS 우상단 **「소리 설정」 버튼**(효과음·배경음 슬라이더, `user://settings.cfg` 저장). BGM 버스는 배경음 추가 대비 미리 만들어둠.
-
-**재설계 v0.4 (P1~P3, UI-only — `src/core` 불변)** — 아래 §2 이유
-- **P1 정보 시간축**: 정보원 패널이 '오늘 입수'만, 턴마다 갱신.
-- **P2 기사 렌더**: 발행 시 「헤드라인」 + 본문 카드(상태줄 대체). 헤드라인은 fact `headlines[논조]`.
-- **P3 정보 선별**: 정보원=오늘만 + **「받은 자료」 오버레이**로 과거 정보 날짜별 열람·"이 기사에 넣기"(원고=오늘+끌어온 것, 턴마다 초기화).
-
-**폴리시**: 창 텍스트 프레임 밖 삐짐 수정(content_margin 실측), 데스크 복귀(← 버튼·ESC), 댓글 창 스크롤.
-
-**댓글 리얼리티**
-- 뱅크 **51→87** (실제 정치 댓글 어조: 물타기·진영조롱·생계호소·팩트코스프레·냉소·whataboutism. 세그먼트별 목소리). `src/core/data/content_slice.json` `comments`.
-- 댓글 작성자 **랜덤 닉네임**(main.gd `HANDLE_POOLS` 세그먼트별 디젤펑크 톤 + 숫자 접미) — 기존 `[seg id]` 반복 대체.
-
-검증: 각 단계 import·`opinion_parity_test`·`turn_flow_test`·smoke 전부 PASS. 엔진(opinion_model) 불변.
+> 기준 브랜치 `game/gireki-sim` (origin 반영 완료). 구조는 [gireki_dev_guide.md](gireki_dev_guide.md), 제출 체크리스트는 [playtest_checklist.md](playtest_checklist.md).
+> **역할 분담 변경**: 남은 게임 개발(재설계 P4·P5, 플레이스홀더 치환 등)은 **작성자(나)가 이어서** 진행. **팀원은 제출용 「AI 활용 기술 문서」** 작성을 맡아주면 좋겠음(이 프로젝트의 승부처). 이 문서 = 그 기술 문서를 쓰는 데 필요한 자료·목차.
 
 ---
 
-## 2. 왜 게임 구조가 처음과 달라졌나 (플레이테스트 반영)
+## 1. 지금까지 만들어진 것 (기술 문서 소스이자 프로젝트 현황)
 
-"정보가 한꺼번에 다 뜨고 재활용되는 느낌" 피드백 → 진단: `content_slice.json`의 fact에 `turn`·`headlines`가 이미 있는데 **정보원 패널이 전체를 1회만 렌더**하고 헤드라인 미사용이었음(get_blocks 턴 게이팅은 이미 정상). → **원 설계(스토리 v0.3 §2·§6 비트시트)로 되돌리는 방향**으로 P1~P3을 UI만 고쳐 구현. 창 배치·아트는 보존.
+**AI 오케스트레이션 파이프라인**으로 「태엽 인간」(석간지 기자가 진실한 문장을 취사·왜곡해 8턴 안에 여론을 돌리는 시뮬레이터)을 만들고 있음. 데모는 파이프라인의 **검증 대상**이고, 파이프라인 자체가 산출물.
 
-**결정된 재설계 방향**: 경제=라이트 / 여론=바늘 게이지 유지(부정확 미학) / 왜곡=취사+재배치 / 거리 채널·과장=보류.
-
----
-
-## 3. 남은 작업 (이어받을 사람 — 우선순위 순)
-
-| 항목 | 내용 | 코어 영향 |
-|---|---|---|
-| **플레이스홀더 치환** | 기존 댓글 11개의 `{대상}`·`{수치}`·`{키워드}`가 런타임 치환 없이 **문자 그대로 노출** 중. 기사 태그에서 슬롯 채우는 로직 필요(설계 `댓글뱅크_설계_v0.1.md` §4) | main.gd/turn_manager |
-| **Phase 4 기사 본문 prose화** | 본문이 블럭 나열이라 몰입 저하. fact×프레임 **authored 본문**(headlines처럼) 데이터화 → 조립. 스토리 §10 "본문 확장=베이킹". + 기사 포커스 제약 | 데이터 위주 |
-| **Phase 5 라이트 경제** | 의뢰 수락→소액 예산→정보원 구매(취사) 제약. **`src/core` 수정이라 spec 먼저**(CLAUDE.md 게이트) | src/core |
-
-**제출(8/10) 관련 — 사람만 가능** (playtest_checklist §B):
-- 아트 `review` 승인(desk_bg 등 generated 3종) · **Pages 배포**(Settings→Pages→GitHub Actions, public 필요) → 실제 URL로 심사자 경험 재현
-- 게임 감각 완주 체감 · **AI 활용 기술 문서**(2계층 아키텍처 — 이 프로젝트 승부처)
+이번까지 본체(`game/gireki-sim`)에 반영된 것:
+- **아트**(디젤펑크): 컨셉→lock→gen→reskin (배경·창 프레임·게이지)
+- **사운드**: 효과음 5종(jsfxr 절차생성) + SE/BGM 오디오 버스 + 소리 설정 UI
+- **재설계 v0.4 P1~P3**: 정보 시간축(정보원 오늘/이월) · 기사 헤드라인+본문 카드 · 「받은 자료」 정보 선별
+- **댓글 리얼리티**: 뱅크 51→87 + 작성자 랜덤 닉네임
+- 검증: parity/turn/smoke 전부 PASS, 엔진(opinion_model) 불변
 
 ---
 
-## 4. 이어서 작업하는 법
-- **새 브랜치**를 `game/gireki-sim`에서 파서 진행(예: `content/article-prose`, `feature/economy`). 완료 시 PR/병합.
-- **`src/core` 수정은 승인된 spec 없이 금지**(CLAUDE.md). Phase 5·플레이스홀더는 spec부터.
-- 매 단계 게이트 유지: `opinion_parity_test`(엔진 바꾸면 골든 재생성) · `turn_flow_test` · `play_test.py`(스모크). opinion_config 변경 시 `dump_opinion_golden.mjs` 재실행.
-- Windows 로컬: `PYTHONUTF8=1`, 로컬 Godot 4.5.1이면 아트 PNG `ERR_FILE_CORRUPT` 뜨나 무해(정본 CI 4.6.x, main.gd null 폴백).
-- 커밋 접두사: `[play build]`/`[content]`/`[play spec]`/`[docs]`.
+## 2. 팀원 담당 — 제출용 「AI 활용 기술 문서」
+
+### 목적
+해커톤 심사에서 **"AI를 어떻게·어디에·왜 그렇게 썼는가"**를 보여주는 문서. 단순 "AI 많이 씀"이 아니라 **판단력**(어디에 AI를 안 썼는지 포함)이 승부처.
+
+### 제안 목차 + 핵심 메시지
+1. **한 줄 요약 / 문제의식** — 게임 개발에서 사람만 해야 하는 일(디렉션·설계 결정·감각·검수)을 제외한 나머지를 **명령만으로** 처리하는 파이프라인.
+2. **2계층 아키텍처 (핵심)** — ① 검증 계층 `sim/opinion-model/`(JS 원본 모델 + 몬테카를로 러너) = **정답 오라클**(웹빌드 제외) ② 런타임 계층 `src/core`·`src/ui`(GDScript) = 실제 게임. 모델 상수는 `opinion_config.json` **단일 출처**(sim·게임이 같이 읽음 → 드리프트 0). `opinion_parity_test`가 이식이 오라클과 **비트-정확** 일치함을 보장. → *메시지: "AI가 만든 걸 그냥 믿지 않고 검증된 오라클과 대조한다."*
+3. **파이프라인 트랙 + 사람 승인 지점** — `lore`(정본) / `play`(spec→build→test) / `art`(concept→lock→gen→reskin) / `se`(gen→attach). `pipeline/manifest.json` = 트랙 간 유기적 연결의 단일 기록. **승인 지점(생략 불가): play spec 승인 · art lock · review** → *"결정권은 사람이 쥔다."*
+4. **AI를 쓴 곳 vs 안 쓴 곳 (승부처)**
+   - **썼다**: 컨셉 아트(FLUX), 스타일 학습·에셋 생성(Scenario 커스텀 모델), 코드 생성(Claude Code, spec→GDScript), 콘텐츠·댓글 초안.
+   - **안 썼다(의도적)**: 여론 엔진 = 검증된 **결정론 모델**(런타임 AI 아님) · 효과음 = **jsfxr 절차생성**(무-API·라이선스 청정·재현 가능) · 밸런싱 = **몬테카를로 시뮬**(감이 아니라 수치, N=4000) · 최종 판단/검수 = 사람.
+   - *메시지: "AI를 안 쓴 지점이 오히려 신뢰성·재현성을 만든다."*
+5. **재현성·검증 장치** — seeded jsfxr(동일 바이트 재생성) · golden fixtures + parity 대조 · 결정론 RNG(mulberry32) · verify 게이트(import·스모크·매니페스트 정합).
+6. **KPI** — 명령 1회당 **사람 개입 시간(분)·횟수** 하락(모든 개선의 방향).
+7. **범용성** — 파이프라인은 장르/스타일을 하드코딩하지 않음(태엽인간은 첫 검증 대상일 뿐. 로그라이크 데모도 병존).
+
+### 문서 쓸 때 참고할 자료 위치 (레포 내)
+- `HANDOFF.md` — 파이프라인 확정 결정사항·KPI·트랙 구성
+- `docs/build/gireki_dev_guide.md` — 2계층 아키텍처·데이터 흐름·핵심 파일 표
+- `docs/conventions.md`, `docs/command-catalog.md` — 명령 규약(정본)
+- `pipeline/manifest.json` + `pipeline/schemas/asset-manifest.schema.json` — 에셋 유기 기록
+- `pipeline/tests/opinion_parity_test.gd`, `turn_flow_test.gd`, `dump_opinion_golden.mjs` — 검증·골든
+- `sim/opinion-model/balance_montecarlo.mjs` + `docs/build/c6_balance.md` — 밸런싱 근거(수치)
+- `pipeline/se_specs/*.json` — 효과음 재현 spec / `docs/web-export.md` — 웹 export 실측
+- 스크린샷·시연: 게임 실행 화면(CRT OS), 파이프라인 명령 실행 로그
+
+### 팀원이 사람으로서 확인·확보할 것 (심사 필수, 코드로 대체 불가)
+- 아트 `review` 승인 여부 · **Pages 배포 URL**(Settings→Pages→GitHub Actions, public 필요) · 시연 영상 · 팀원 역할 기술서
+
+---
+
+## 3. 남은 게임 개발 — 작성자(나)가 진행 (팀원 참고용, 손 안 대도 됨)
+- **플레이스홀더 치환**: 기존 댓글 11개 `{대상}`·`{수치}` 리터럴 노출 → 치환 로직
+- **Phase 4 기사 본문 prose화**: fact×프레임 authored 본문(블럭 나열 → 문장) · 기사 포커스 제약
+- **Phase 5 라이트 경제**: 의뢰→예산→정보원 구매(⚠️ `src/core` → spec 먼저)
+
+> 개발 진행은 `game/gireki-sim`에서 새 브랜치로. src/core는 승인 spec 없이 수정 금지(CLAUDE.md). 매 단계 parity/turn/smoke 게이트 유지.
