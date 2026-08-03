@@ -102,8 +102,9 @@ PYTHONUTF8=1 GODOT_BIN="$GODOT_BIN" python pipeline/scripts/play_test.py --scree
 | **C5 후일담**(성공 엔딩 정직/냉혹 분기 — F15 은폐 여부로 판정) | ✅ (`turn_manager.epilogue()` + `EPILOGUES`) |
 | 댓글 반복방어(쿨다운 큐 + 표현층 별도 RNG) + 시드 흡수 | ✅ (`COMMENT_COOLDOWN`, 발각 RNG와 분리) |
 | 웹 빌드 한글 폰트 번들(neodgm) + Pages 배포 워크플로 | ✅ (`deploy-web.yml`, 수동 트리거) |
-| **콘텐츠 대량 베이킹**(F 전체·댓글 변주 — 임금 topic 댓글 필수 포함) | ⬜ 사람+오프라인 LLM(스토리 §10) |
-| **아트/사운드**: 배경 16:9 최종 reskin · 게이지 아트 · se gen/attach | ⬜ (placeholder 상태, art lock 대기) |
+| **콘텐츠 대량 베이킹**(F1~F16 + 8턴 비트시트 + 댓글 143·prose 16) | ✅ (`lore export` 경유, 임금 topic 포함) |
+| **아트/사운드**: art lock(taeyeop-dieselpunk) → gen → reskin · SE 9종 | ✅ (`docs/style_guide.md`, 매니페스트 generated) |
+| **찌라시 자생**(NPC 발 허위 소문 · 3단계 에스컬레이션 · 소재 게이팅) | ✅ (표현층 전용 — `docs/specs/rumor_emergence.md`) |
 | **웹 export → GitHub Pages 실제 배포 확인** | ⬜ (워크플로는 준비됨 — Actions 탭에서 수동 실행, 선행: Settings→Pages→Source=GitHub Actions) |
 
 ## 8. 주의점

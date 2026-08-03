@@ -1832,13 +1832,27 @@ func _render_comments(comments: Array) -> void:
 	var i: int = 0
 	for c in comments:
 		var row := VBoxContainer.new()
+		# 찌라시(NPC 자생 허위 소문)는 일반 반응과 구분해 보여준다. 세계 규칙상
+		# 플레이어가 다루는 정보는 전부 진실이고, 거짓은 여기서만 나온다.
+		# spec: docs/specs/rumor_emergence.md
+		var rumor: String = str(c.get("rumor", ""))
+		var lv: int = int(c.get("level", 0))
 		var handle := Label.new()
-		handle.text = _comment_handle(str(c.get("seg", "")))
-		handle.add_theme_color_override("font_color", Color(0.62, 0.78, 0.95))
+		if rumor != "":
+			handle.text = "%s  ⚠ 확인되지 않은 이야기" % _comment_handle(str(c.get("seg", "")))
+			# 단계가 셀수록 붉게 — 확신형(3)은 명백한 허위라 가장 눈에 띈다.
+			handle.add_theme_color_override("font_color",
+				Color(0.95, 0.62, 0.35) if lv < 3 else Color(1.0, 0.42, 0.35))
+		else:
+			handle.text = _comment_handle(str(c.get("seg", "")))
+			handle.add_theme_color_override("font_color", Color(0.62, 0.78, 0.95))
 		row.add_child(handle)
 		var body := Label.new()
 		body.text = _fill_slots(str(c.get("text", "")), c.get("topic"))
 		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if rumor != "":
+			body.add_theme_color_override("font_color",
+				Color(0.92, 0.80, 0.62) if lv < 3 else Color(1.0, 0.72, 0.62))
 		row.add_child(body)
 		var spacer := Control.new()
 		spacer.custom_minimum_size = Vector2(0, 6)

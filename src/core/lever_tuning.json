@@ -6,5 +6,36 @@
   "_k_lean": "기울기 계수. frameValue = clamp(0.5 + k_lean*lean, 0.2, 0.8). lean = 유리노출 + 불리은폐 - 불리노출.",
   "tone": "자극",
   "channel": "sns",
-  "_tone_channel": "슬라이스 단순화로 고정(레버 미노출). Phase C에서 레버로 복원."
+  "_tone_channel": "슬라이스 단순화로 고정(레버 미노출). Phase C에서 레버로 복원.",
+
+  "rumor": {
+    "_desc": "찌라시 자생(표현층 전용 — 여론·발각 수치에 영향 없음). spec: docs/specs/rumor_emergence.md",
+    "p_base": 0.10,
+    "_p_base": "매 턴 기본 자생 확률(열기 0일 때).",
+    "heat_gain": 0.55,
+    "_heat_gain": "확률 = clamp(p_base + heat * heat_gain, 0, p_max).",
+    "p_max": 0.85,
+    "heat_per_turn": 0.04,
+    "_heat_per_turn": "턴이 갈수록 달아오른다(초반 미미 → 후반 절정, 기획서 §6).",
+    "contrib": {
+      "_desc": "이번 턴 보도한 사실이 열기에 더하는 값. 플레이어가 만든 판이 소문을 부른다.",
+      "F11": 0.22,
+      "F7": 0.14,
+      "F9": 0.10,
+      "F12": 0.16,
+      "F16": 0.20
+    },
+    "avoid_bonus": 0.06,
+    "_avoid_bonus": "F11(비공개)이 등장했는데 보도하지 않으면 오히려 의심이 자란다(회피도 신호).",
+    "level_thresholds": [0.0, 0.45, 0.95],
+    "_level_thresholds": "누적 열기 → level 1/2/3 경계. 단조 증가(한 번 오르면 안 내려감).",
+    "gates": {
+      "_desc": "소재별 등장 조건. 맥락 없는 소문은 '랜덤'으로 읽히므로 게이팅한다. mode=encountered 는 그 사실이 자료로 등장하기만 해도(보도 무관) 열림 — 비공개는 회사가 감춘다는 사실 자체가 소문의 씨앗이라 지면과 무관하게 퍼진다(스토리 T2 '재료 뭐냐' 첫 찌라시). mode=reported 는 플레이어가 실제로 실었을 때만 — 일곱이·소각은 보도가 계기.",
+      "인간재료": { "facts": ["F11"], "mode": "encountered" },
+      "일곱이": { "facts": ["F7"], "mode": "reported" },
+      "소각": { "facts": ["F16"], "mode": "reported" }
+    },
+    "segments": ["sns_against", "sns_swing"],
+    "_segments": "찌라시가 자생하는 세그먼트(반대층·부동층). 기획서 §6."
+  }
 }
