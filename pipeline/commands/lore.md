@@ -1,6 +1,6 @@
 # lore 명령군 정의 (정본 계약)
 
-> 이 문서는 lore 트랙 명령(`init` / `query` / `check`)의 **입출력 계약과 처리 플로우**를 정의한다.
+> 이 문서는 lore 트랙 명령(`init` / `query` / `check` / `export`)의 **입출력 계약과 처리 플로우**를 정의한다.
 > 명령 범위의 최상위 정본은 `docs/command-catalog.md` 이며, 이 문서는 그중 lore 트랙을 구현 수준으로 상세화한 것이다.
 > 슬래시 커맨드(`.claude/commands/lore*.md`)와 보조 스크립트(`pipeline/scripts/lore_*.py`)는 이 계약을 따른다.
 
@@ -91,6 +91,27 @@
 2. **판단(의미 검사)**: Claude 가 canon 을 읽고 의미적 모순/공백 후보를 추가 리포트.
 3. **사람 검수/반영**: 통합 리포트를 제시. 수정은 별도 `lore edit`(미구현, Phase 1 범위 밖) 또는 사용자 지시로 진행하며, `lore check` 자체는 canon 을 쓰지 않는다.
 
+## `lore export <대상>`
+
+**목적**: canon 을 컨텍스트로 게임 내 텍스트를 생성해 런타임 데이터에 반영한다.
+(command-catalog: "아이템 설명, 대사, UI 문구 등". 첫 구현 대상 = **댓글 뱅크 변주**.)
+
+**입력**: 대상(`comments` 등) + 생성 지침(세그먼트×반응 조합, 규모, topic 커버리지).
+
+**출력**: `src/core/data/content_slice.json` 에 병합된 텍스트(사람 승인 후).
+
+**역할 분담**: 텍스트 생성은 Claude(canon 발췌를 근거로, 기존 뱅크 어조와 정합).
+`lore_export.py` 는 기계 검증(스키마·id/text 중복·canon topic 정본·슬롯 `{키워드|대상|수치|집단}`·
+**죽은 조합 차단** — 코어 선택 로직상 노출 불가한 seg×reaction)과 기계적 병합만 한다.
+병합은 전체 재직렬화가 아니라 한 줄 객체 삽입 + 재파싱 무결성 확인(리뷰 diff 최소화).
+
+**처리 플로우**:
+1. **생성**: `lore_index.py query` 로 관련 canon 발췌(세그먼트 정의·topic 규정) 확보 →
+   Claude 가 후보 JSON(`{"comments": [...]}`) 작성. 기존 뱅크와 어조·중복 대조.
+2. **자동 검증**: `lore_export.py validate --input <후보.json>` — 오류 0 이어야 진행.
+3. **사람 검수**: 후보 텍스트 + `report` 커버리지(전/후)를 제시하고 승인을 받는다.
+4. **반영**: 승인 후에만 `lore_export.py apply`. 이후 `lore_check.py` + 게임 테스트로 회귀 확인.
+
 ---
 
 ## 관련 파일
@@ -101,7 +122,9 @@
 | `.claude/commands/lore-init.md` | `/lore-init` 진입점 |
 | `.claude/commands/lore-query.md` | `/lore-query` 진입점 |
 | `.claude/commands/lore-check.md` | `/lore-check` 진입점 |
+| `.claude/commands/lore-export.md` | `/lore-export` 진입점 |
 | `pipeline/scripts/lore_index.py` | canon 파싱/색인/검색 (index, query) |
 | `pipeline/scripts/lore_check.py` | 기계적 정합성 검사 리포터 |
+| `pipeline/scripts/lore_export.py` | export 후보 기계 검증 + 병합 (validate/apply/report) |
 | `pipeline/tests/fixtures/` | 테스트용 canon (정본 아님). `sample_canon`(결함 포함), `clean_canon`(무결함) |
 | `pipeline/tests/run_lore_roundtrip.py` | init(fixture)→query→check 왕복 자동 테스트 |
