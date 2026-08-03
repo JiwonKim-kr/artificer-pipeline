@@ -14,10 +14,14 @@ const DESK_SEARCH_TEX := "res://assets/art/ui/main/desk_search_closeup.png"
 # 현 desk_bg.png 실측: 브라운관 유리면 중심 ≈ (0.51, 0.35).
 const MONITOR_FOCUS := Vector2(0.51, 0.35)
 
-# 게임 제목(가제) — 확정 시 이 두 상수만 바꾸면 타이틀 화면에 반영된다.
-# 신문 제호(마스트헤드) 컨셉: 플레이어=치차 석간 기자이므로 제호가 곧 타이틀.
-const TITLE_TEXT := "치차 석간"
-const TITLE_SUB := "— 태엽 인간 사건 —"
+# 게임 제목 — 네온사인 컨셉. N 이 지직거리다 꺼지면 GUIDE / LI E 만 남아
+# 'LIE 를 GUIDE 한다'는 이중 의미가 드러난다 (SKYHILL 의 H 점멸 → ILL 강조와 같은 기법).
+const TITLE_TEXT := "GUIDELINE"
+const TITLE_FLICKER_IDX := 7    # 'N' (G0 U1 I2 D3 E4 L5 I6 N7 E8)
+const TITLE_SUB := "치차 석간 — 태엽 인간 사건"
+const NEON_ON := Color(1.0, 0.38, 0.22)          # 네온 레드오렌지(디젤펑크 가스관 사인)
+const NEON_GLOW := Color(1.0, 0.30, 0.12, 0.38)  # 글로우(아웃라인)
+const NEON_OFF := Color(0.28, 0.13, 0.10, 0.35)  # 꺼진 관(희미한 유리관 잔상)
 const SETTINGS_PATH := "user://settings.cfg"  # 사운드 볼륨 등 사용자 설정 저장
 
 ## 댓글 작성자 핸들 풀 — 세그먼트 페르소나(설계 §4·§5)에 맞춘 디젤펑크 톤.
@@ -111,9 +115,12 @@ var _title_view: Control            # 타이틀 화면(시작 전)
 var _day_card: Control              # 턴 경과(석간 마감→다음 날) 인터스티셜
 var _day_label: Label
 var _windows: Dictionary = {}       # OS 앱 창: key -> PanelContainer (mail/informant/editor/comments/gauge)
-var _dock_btns: Dictionary = {}     # OS 독 버튼: key -> Button (라벨 갱신·배지용)
+var _dock_btns: Dictionary = {}     # 태스크바 앱 버튼: key -> Button (열림 표시·배지용)
 var _mail_list: VBoxContainer       # 수신함 본문(최신이 위)
 var _mail_unread: int = 0
+var _neon_n: Label                  # 타이틀 네온사인의 점멸 글자(N)
+var _neon_rng := RandomNumberGenerator.new()
+var _taskbar_day: Label             # 태스크바 우측 "제 N 일" 표시
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -134,44 +141,64 @@ func _ready() -> void:
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fade_rect)
 
-# ---------- 타이틀 화면 (신문 제호 컨셉) ----------
+# ---------- 타이틀 화면 (네온사인 컨셉) ----------
 func _build_title() -> void:
 	_title_view = Control.new()
 	_title_view.name = "TitleView"
 	_title_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_title_view)
 	var bg := ColorRect.new()
-	bg.color = Color(0.10, 0.085, 0.06)  # 오래된 갱지 톤의 어두운 배경
+	bg.color = Color(0.045, 0.045, 0.06)  # 밤거리 톤
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_title_view.add_child(bg)
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 12)
 	_title_view.add_child(box)
-	# 제호 위아래의 이중 괘선(굵은 선+가는 선)으로 신문 마스트헤드 느낌을 만든다.
-	box.add_child(_masthead_rule())
 	var date_line := Label.new()
 	date_line.text = "아이젠 공화국 · 치차  |  노동 근대화법 표결 8일 전"
 	date_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	date_line.add_theme_color_override("font_color", Color(0.62, 0.58, 0.48))
+	date_line.add_theme_color_override("font_color", Color(0.5, 0.5, 0.56))
 	box.add_child(date_line)
-	var title := Label.new()
-	title.text = TITLE_TEXT
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 72)
-	title.add_theme_color_override("font_color", Color(0.93, 0.85, 0.68))
-	box.add_child(title)
+	# 네온 표지판: 어두운 금속판 위에 글자별 네온관. N(TITLE_FLICKER_IDX)만 지직거리며,
+	# 꺼진 순간 GUIDE / LI E — 'LIE' 가 드러난다.
+	var sign := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.07, 0.07, 0.085)
+	sb.border_color = Color(0.30, 0.30, 0.34)
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(6)
+	sb.content_margin_left = 40.0
+	sb.content_margin_right = 40.0
+	sb.content_margin_top = 18.0
+	sb.content_margin_bottom = 18.0
+	sign.add_theme_stylebox_override("panel", sb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	sign.add_child(row)
+	for i in TITLE_TEXT.length():
+		var l := Label.new()
+		l.text = TITLE_TEXT[i]
+		l.add_theme_font_size_override("font_size", 84)
+		l.add_theme_color_override("font_color", NEON_ON)
+		l.add_theme_color_override("font_outline_color", NEON_GLOW)
+		l.add_theme_constant_override("outline_size", 14)
+		row.add_child(l)
+		if i == TITLE_FLICKER_IDX:
+			_neon_n = l
+	var sign_wrap := CenterContainer.new()
+	sign_wrap.add_child(sign)
+	box.add_child(sign_wrap)
 	var sub := Label.new()
 	sub.text = TITLE_SUB
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.add_theme_font_size_override("font_size", 22)
-	sub.add_theme_color_override("font_color", Color(0.78, 0.66, 0.44))
+	sub.add_theme_font_size_override("font_size", 20)
+	sub.add_theme_color_override("font_color", Color(0.62, 0.58, 0.48))
 	box.add_child(sub)
-	box.add_child(_masthead_rule())
 	var pad := Control.new()
-	pad.custom_minimum_size = Vector2(0, 18)
+	pad.custom_minimum_size = Vector2(0, 16)
 	box.add_child(pad)
 	var start := _desk_button("출근한다", 52)
 	start.name = "StartButton"
@@ -182,22 +209,35 @@ func _build_title() -> void:
 	var hint := Label.new()
 	hint.text = "무엇을 싣고, 무엇을 뺄 것인가."
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_color_override("font_color", Color(0.5, 0.47, 0.4))
+	hint.add_theme_color_override("font_color", Color(0.45, 0.44, 0.4))
 	box.add_child(hint)
-	# 제호가 스르륵 떠오르는 인트로.
 	box.modulate = Color(1, 1, 1, 0)
 	var tw := create_tween()
 	tw.tween_property(box, "modulate:a", 1.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(_neon_flicker_loop)
 
-func _masthead_rule() -> Control:
-	var rule := VBoxContainer.new()
-	rule.add_theme_constant_override("separation", 3)
-	for h in [3, 1]:
-		var line := ColorRect.new()
-		line.color = Color(0.62, 0.52, 0.34)
-		line.custom_minimum_size = Vector2(560, h)
-		rule.add_child(line)
-	return rule
+## N 네온관 점멸 루프: 켜짐 유지 → 지직(급점멸 2~4회) → 한동안 꺼짐(LIE 노출) → 재점등.
+## 매 사이클 난수 재구성이라 기계적으로 반복되지 않는다. 타이틀을 떠나면 스스로 멈춘다.
+func _neon_flicker_loop() -> void:
+	if _neon_n == null or _title_view == null or not _title_view.visible:
+		return
+	var tw := create_tween()
+	tw.tween_interval(_neon_rng.randf_range(0.9, 2.4))
+	for i in _neon_rng.randi_range(2, 4):
+		tw.tween_callback(_set_neon.bind(false))
+		tw.tween_interval(_neon_rng.randf_range(0.03, 0.09))
+		tw.tween_callback(_set_neon.bind(true))
+		tw.tween_interval(_neon_rng.randf_range(0.04, 0.12))
+	tw.tween_callback(_set_neon.bind(false))
+	tw.tween_interval(_neon_rng.randf_range(0.8, 1.8))  # 꺼진 동안 'GUIDE LI E' = LIE
+	tw.tween_callback(_set_neon.bind(true))
+	tw.tween_callback(_neon_flicker_loop)
+
+func _set_neon(on: bool) -> void:
+	if _neon_n == null:
+		return
+	_neon_n.add_theme_color_override("font_color", NEON_ON if on else NEON_OFF)
+	_neon_n.add_theme_constant_override("outline_size", 14 if on else 0)
 
 func _start_game() -> void:
 	if _transitioning:
@@ -631,46 +671,58 @@ func _build_screen() -> void:
 	_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_screen)
 
-	var scr_bg := ColorRect.new()
-	scr_bg.color = Color(0.03, 0.05, 0.03)
-	scr_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_screen.add_child(scr_bg)
+	# 모니터 베젤: 화면 가장자리를 두른 바켈라이트 테두리 — OS 는 이 "유리면" 안에만 산다.
+	var bezel := Panel.new()
+	bezel.name = "MonitorBezel"
+	bezel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var bsb := StyleBoxFlat.new()
+	bsb.bg_color = Color(0.09, 0.07, 0.055)
+	bsb.border_color = Color(0.32, 0.24, 0.14)  # 브라스 라인
+	bsb.set_border_width_all(2)
+	bsb.set_corner_radius_all(10)
+	bezel.add_theme_stylebox_override("panel", bsb)
+	_screen.add_child(bezel)
+	var power_led := ColorRect.new()  # 베젤 우하단 전원 램프
+	power_led.color = Color(1.0, 0.62, 0.2)
+	power_led.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	power_led.offset_left = -14.0
+	power_led.offset_top = -14.0
+	power_led.offset_right = -7.0
+	power_led.offset_bottom = -7.0
+	bezel.add_child(power_led)
 
+	# ScreenOS = 유리면(베젤 안쪽 22px). 바탕화면·아이콘·태스크바·창 전부 이 안에.
 	var os := Control.new()
 	os.name = "ScreenOS"
 	os.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	os.offset_left = 22.0
+	os.offset_top = 22.0
+	os.offset_right = -22.0
+	os.offset_bottom = -22.0
+	os.clip_contents = true  # 창을 끌어도 유리면 밖(베젤 위)으로 나가지 않는다
 	_screen.add_child(os)
 	_os = os
-	# 배치는 디자인 해상도 1152x648 기준. 프레임(9-slice)의 content margin 이
-	# 상 54·하 28·좌우 30 이므로 창을 그만큼 여유 있게 잡는다.
-	# OS 바탕화면: 창들은 앱이다 — 기본은 닫혀 있고 상단 독(dock) 아이콘으로 연다.
-	_windows["informant"] = _make_informant(Vector2(20, 46), Vector2(340, 292))
-	_windows["editor"] = _make_editor(Vector2(376, 46), Vector2(432, 556))
-	_windows["comments"] = _make_comments(Vector2(824, 46), Vector2(308, 400))
-	_windows["gauge"] = _make_gauge(Vector2(20, 350), Vector2(340, 252))
-	_windows["mail"] = _make_mail(Vector2(300, 110), Vector2(500, 400))
+	var wallpaper := ColorRect.new()
+	wallpaper.name = "Wallpaper"
+	wallpaper.color = Color(0.035, 0.06, 0.045)  # CRT 인광 그린 바탕화면
+	wallpaper.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	os.add_child(wallpaper)
+	_build_desktop_icons(os)
+	# 앱 창 (유리면 좌표계, 태스크바 34px 를 뺀 작업영역 안):
+	_windows["informant"] = _make_informant(Vector2(96, 8), Vector2(336, 288))
+	_windows["editor"] = _make_editor(Vector2(356, 8), Vector2(420, 554))
+	_windows["comments"] = _make_comments(Vector2(788, 8), Vector2(308, 400))
+	_windows["gauge"] = _make_gauge(Vector2(96, 304), Vector2(336, 252))
+	_windows["mail"] = _make_mail(Vector2(290, 76), Vector2(500, 400))
 	for key in _windows:
 		var w := _windows[key] as PanelContainer
+		w.set_meta("app_key", key)
 		os.add_child(w)
 		w.visible = false
-	var back := Button.new()
-	back.name = "BackButton"
-	back.text = "← 데스크 (Esc)"
-	back.position = Vector2(12, 10)
-	back.custom_minimum_size = Vector2(150, 30)
-	back.pressed.connect(_exit_screen)
-	os.add_child(back)
-	_build_dock(os)
-	var settings_btn := Button.new()
-	settings_btn.name = "SettingsButton"
-	settings_btn.text = "소리 설정"
-	settings_btn.position = Vector2(1002, 10)
-	settings_btn.custom_minimum_size = Vector2(130, 30)
-	settings_btn.pressed.connect(_toggle_settings)
-	os.add_child(settings_btn)
+	_build_taskbar(os)
 	# 첫 부팅: 의뢰 메일이 도착해 있고, 수신함이 열린 채 시작한다(온보딩).
 	_push_mail("산업위원회 (발신전용)", "의뢰 — 표결일까지",
-		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐社도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n※ 독의 [정보원]에서 오늘 입수한 사실을 확인하고 [원고]에서 기사를 발행할 것." % [
+		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐社도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n※ [정보원]에서 오늘 입수한 사실을 확인하고 [원고]에서 기사를 발행할 것." % [
 			_tm.max_turns, int(round(float(_tm.model.config["mission"]["winThreshold"]) * 100.0))])
 	_open_win("mail")
 	_build_settings_panel(os)
@@ -683,7 +735,12 @@ func _build_screen() -> void:
 
 	var crt := ColorRect.new()
 	crt.name = "CrtOverlay"
+	# CRT 효과(스캔라인·곡률·비네트)는 베젤이 아니라 유리면 위에만 얹는다.
 	crt.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	crt.offset_left = 22.0
+	crt.offset_top = 22.0
+	crt.offset_right = -22.0
+	crt.offset_bottom = -22.0
 	crt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sh := _res(CRT_SHADER)
 	if sh != null:
@@ -693,25 +750,82 @@ func _build_screen() -> void:
 		_crt_mat = mat  # 파워온 연출에서 스캔라인·색수차 파라미터를 트윈
 	_screen.add_child(crt)
 
-# ---------- OS 독 (앱 런처) ----------
-const DOCK_APPS := [
-	["mail", "메일"], ["informant", "정보원"], ["editor", "원고"], ["comments", "댓글"], ["gauge", "여론계"],
+# ---------- OS 태스크바 + 바탕화면 아이콘 ----------
+const APPS := [  # [key, 라벨, 아이콘 글리프]
+	["mail", "메일", "✉"], ["informant", "정보원", "☏"], ["editor", "원고", "✎"],
+	["comments", "댓글", "❝"], ["gauge", "여론계", "◉"],
 ]
 
-func _build_dock(parent: Control) -> void:
-	var dock := HBoxContainer.new()
-	dock.name = "Dock"
-	dock.position = Vector2(180, 10)
-	dock.add_theme_constant_override("separation", 6)
-	parent.add_child(dock)
-	for app in DOCK_APPS:
+func _build_taskbar(parent: Control) -> void:
+	var bar := PanelContainer.new()
+	bar.name = "Taskbar"
+	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	bar.offset_top = -34.0
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.09, 0.07, 0.96)
+	sb.border_color = Color(0.30, 0.24, 0.14)
+	sb.border_width_top = 2
+	sb.content_margin_left = 6.0
+	sb.content_margin_right = 8.0
+	sb.content_margin_top = 3.0
+	sb.content_margin_bottom = 3.0
+	bar.add_theme_stylebox_override("panel", sb)
+	parent.add_child(bar)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	bar.add_child(row)
+	var back := Button.new()
+	back.name = "BackButton"
+	back.text = "◀ 데스크"
+	back.tooltip_text = "모니터에서 물러난다 (Esc)"
+	back.custom_minimum_size = Vector2(92, 0)
+	back.pressed.connect(_exit_screen)
+	row.add_child(back)
+	row.add_child(VSeparator.new())
+	for app in APPS:
 		var key := str(app[0])
 		var b := Button.new()
 		b.text = str(app[1])
-		b.custom_minimum_size = Vector2(88, 30)
+		b.custom_minimum_size = Vector2(78, 0)
 		b.pressed.connect(_toggle_win.bind(key))
-		dock.add_child(b)
+		row.add_child(b)
 		_dock_btns[key] = b
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+	_taskbar_day = Label.new()
+	_taskbar_day.text = "제 1 일 / %d" % _tm.max_turns
+	_taskbar_day.add_theme_color_override("font_color", Color(0.75, 0.8, 0.7))
+	row.add_child(_taskbar_day)
+	var settings_btn := Button.new()
+	settings_btn.name = "SettingsButton"
+	settings_btn.text = "소리"
+	settings_btn.pressed.connect(_toggle_settings)
+	row.add_child(settings_btn)
+	_update_taskbar_state()
+
+## 바탕화면 아이콘(좌측 1열). 창이 위를 덮는 건 실제 OS 와 같다 — 태스크바로도 열 수 있다.
+func _build_desktop_icons(parent: Control) -> void:
+	var y := 12.0
+	for app in APPS:
+		var key := str(app[0])
+		var icon := _desk_button(str(app[2]), 44)
+		icon.custom_minimum_size = Vector2(52, 44)
+		icon.position = Vector2(20, y)
+		icon.add_theme_font_size_override("font_size", 22)
+		icon.tooltip_text = str(app[1])
+		icon.pressed.connect(_toggle_win.bind(key))
+		parent.add_child(icon)
+		var lb := Label.new()
+		lb.text = str(app[1])
+		lb.position = Vector2(4, y + 46)
+		lb.custom_minimum_size = Vector2(84, 0)
+		lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lb.add_theme_font_size_override("font_size", 13)
+		lb.add_theme_color_override("font_color", Color(0.72, 0.82, 0.72))
+		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(lb)
+		y += 96.0
 
 func _toggle_win(key: String) -> void:
 	var w := _windows.get(key) as PanelContainer
@@ -719,6 +833,7 @@ func _toggle_win(key: String) -> void:
 		return
 	if w.visible:
 		w.visible = false
+		_update_taskbar_state()
 	else:
 		_open_win(key)
 
@@ -737,12 +852,28 @@ func _open_win(key: String) -> void:
 	if key == "mail":
 		_mail_unread = 0
 		_update_mail_badge()
+	_update_taskbar_state()
+
+## 프레임의 X/— 히트박스가 부르는 닫기(=태스크바로 내리기).
+func _close_window(panel: PanelContainer) -> void:
+	panel.visible = false
+	_update_taskbar_state()
+
+## 태스크바 버튼에 열림 상태 반영: 열린 앱은 밝게, 닫힌 앱은 어둡게.
+func _update_taskbar_state() -> void:
+	for key in _dock_btns:
+		var b := _dock_btns[key] as Button
+		var w := _windows.get(key) as PanelContainer
+		var open := w != null and w.visible
+		b.modulate = Color(1, 1, 1) if open else Color(0.68, 0.72, 0.68)
+	_update_mail_badge()
 
 func _update_mail_badge() -> void:
 	var b := _dock_btns.get("mail") as Button
 	if b != null:
 		b.text = "메일" if _mail_unread <= 0 else "메일(%d)" % _mail_unread
-		b.modulate = Color(1, 1, 1) if _mail_unread <= 0 else Color(1.0, 0.85, 0.6)
+		if _mail_unread > 0:
+			b.modulate = Color(1.0, 0.85, 0.6)
 
 # ---------- 메일 앱 (편집장·압박·분기 메시지 수신함) ----------
 func _make_mail(pos: Vector2, size: Vector2) -> PanelContainer:
@@ -818,16 +949,23 @@ func _window_gui_input(ev: InputEvent, panel: PanelContainer) -> void:
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
 				panel.move_to_front()
+				# 프레임 아트에 그려진 창 버튼을 실제로 동작시킨다:
+				# 우상단(□·X) = 닫기 / 좌상단(—) = 내리기(같은 효과, 태스크바에서 다시 연다).
+				if mb.position.y <= 46.0 and mb.position.x >= panel.size.x - 88.0:
+					_close_window(panel)
+					return
+				if mb.position.y <= 46.0 and mb.position.x <= 88.0:
+					_close_window(panel)
+					return
 				if mb.position.y <= 64.0:  # 타이틀바(상단 브라스 두께) 영역만 드래그 시작
 					panel.set_meta("dragging", true)
 			else:
 				panel.set_meta("dragging", false)
 	elif ev is InputEventMouseMotion and bool(panel.get_meta("dragging", false)):
-		var vp := get_viewport_rect().size
+		var area: Vector2 = (panel.get_parent() as Control).size  # 유리면(ScreenOS) 안으로 제한
 		var p: Vector2 = panel.position + (ev as InputEventMouseMotion).relative
-		# 창이 화면 밖으로 사라지지 않게 타이틀바가 항상 잡히는 범위로 제한.
-		p.x = clampf(p.x, -panel.size.x + 80.0, vp.x - 80.0)
-		p.y = clampf(p.y, 0.0, vp.y - 60.0)
+		p.x = clampf(p.x, -panel.size.x + 80.0, area.x - 80.0)
+		p.y = clampf(p.y, 0.0, area.y - 70.0)
 		panel.position = p
 
 func _body_of(panel: Node) -> VBoxContainer:
@@ -1138,6 +1276,8 @@ func _on_publish() -> void:
 func _update_turn_label() -> void:
 	if _turn_label != null and _tm != null:
 		_turn_label.text = "턴 %d / %d" % [_tm.model.turn + 1, _tm.max_turns]
+	if _taskbar_day != null and _tm != null:
+		_taskbar_day.text = "제 %d 일 / %d" % [_tm.model.turn + 1, _tm.max_turns]
 
 ## 발행된 기사를 [헤드라인] + 본문(포함 블록, 최대 6줄)으로 조립해 카드로 보여준다.
 ## 헤드라인 = 첫 보도 fact 의 headlines[논조]. 본문 = 플레이어가 실은 문장들(등장 순서).
