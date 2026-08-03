@@ -5,6 +5,8 @@ extends Control
 ## 로직은 TurnManager(코어)에 위임. 마우스/클릭 전용. spec: docs/specs/turn_loop_vertical_slice.md
 
 const DESK_BG := "res://assets/art/ui/main/desk_bg.png"
+# hover 시 배경 전체를 교체하는 변형본(원본과 동일 구도·해상도, 모니터만 다름).
+const DESK_BG_MONITOR := "res://assets/art/ui/main/desk_bg_monitor.png"       # 모니터 불 켜짐(hover)
 const GAUGE_TEX := "res://assets/art/ui/gauge/opinion_needle.png"
 # 브라스 프레임 아트(frame.png)는 슬림 크롬 전환으로 창에서는 미사용.
 # 매니페스트 art:ui/window/frame 은 유지 — 향후 타이틀 사인/엔딩 액자 재활용 후보.
@@ -95,7 +97,8 @@ var _pub_button: Button
 var _pressure_label: Label
 var _branch_label: Label
 var _desk_search_btn: Button
-var _desk_fx: Control            # desk_fx.tscn 인스턴스(화면 발광·서랍 그림자 — 에디터 튜닝)
+var _desk_bg_rect: TextureRect   # 데스크 배경 — hover 시 이 텍스처를 변형본으로 교체
+var _desk_bg_default: Texture2D  # 원본 desk_bg (hover 해제 시 복귀)
 var _desk_note: Label
 var _f16_shown: bool = false
 var _informant_body: VBoxContainer  # 정보원 패널 스크롤 본문(턴별 갱신 대상)
@@ -297,34 +300,25 @@ func _build_desk() -> void:
 	var tex := _res(DESK_BG)
 	if tex != null:
 		bg.texture = tex
+		_desk_bg_default = tex
 	else:
 		var cr := ColorRect.new()
 		cr.color = Color(0.14, 0.10, 0.07)
 		cr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		_desk.add_child(cr)
 	_desk.add_child(bg)
+	_desk_bg_rect = bg  # hover 시 이 배경 텍스처를 변형본으로 교체
 
-	# hover 효과(화면 발광·서랍 그림자)는 에디터 편집용 씬으로 분리 → desk_fx.tscn.
-	# 색·강도·위치는 그 씬을 Godot 에디터에서 열어 조절한다(코드 수정 불필요).
-	var fx_ps: PackedScene = _res("res://scenes/desk_fx.tscn") as PackedScene
-	if fx_ps != null:
-		_desk_fx = fx_ps.instantiate()
-		_desk.add_child(_desk_fx)
-
-	# 버튼을 없애고, 배경의 모니터/책상 하단부 자체를 클릭 영역(핫스팟)으로 쓴다.
-	# hover 시 desk_fx 효과가 켜지고, 클릭 시 진입/책상 뒤지기.
-	# 좌표는 desk_bg.png(1152×648, 뷰포트와 1:1) 실측. TV 중심 (0.51,0.35)=MONITOR_FOCUS 검증.
-	var monitor_hot := _desk_hotspot(Rect2(0.339, 0.081, 0.320, 0.559))  # CRT 모니터 · 좌 -5px·우 -30px·위 -20px
+	# 모니터: hover 시 배경을 '불 켜진' 변형본으로 교체(벗어나면 원본 복귀), 클릭=진입.
+	var monitor_hot := _desk_hotspot(Rect2(0.339, 0.081, 0.320, 0.559))  # CRT 모니터
 	monitor_hot.name = "MonitorHotspot"
 	monitor_hot.pressed.connect(_enter_screen)
-	monitor_hot.mouse_entered.connect(func() -> void: if _desk_fx: _desk_fx.set_screen_on(true))
-	monitor_hot.mouse_exited.connect(func() -> void: if _desk_fx: _desk_fx.set_screen_on(false))
+	_hover_swap(monitor_hot, DESK_BG_MONITOR)
 	_desk.add_child(monitor_hot)
-	var drawer_hot := _desk_hotspot(Rect2(0.03, 0.82, 0.94, 0.175))  # 책상 하단부(서랍 전면)
+	# 서랍: 이미지 교체 롤백 → 단일 핫스팟, 클릭=책상 뒤지기(hover 이미지 없음).
+	var drawer_hot := _desk_hotspot(Rect2(0.03, 0.82, 0.94, 0.175))  # 책상 하단부(서랍)
 	drawer_hot.name = "DrawerHotspot"
 	drawer_hot.pressed.connect(_search_desk)
-	drawer_hot.mouse_entered.connect(func() -> void: if _desk_fx: _desk_fx.set_drawer_open(true))
-	drawer_hot.mouse_exited.connect(func() -> void: if _desk_fx: _desk_fx.set_drawer_open(false))
 	_desk.add_child(drawer_hot)
 	_desk_note = Label.new()
 	_desk_note.add_theme_color_override("font_color", Color(0.85, 0.9, 0.78))
@@ -340,6 +334,16 @@ func _build_desk() -> void:
 	_desk_note.offset_top = 0.0
 	_desk_note.offset_bottom = 0.0
 	_desk.add_child(_desk_note)
+
+## hover 시 데스크 배경을 변형본으로 교체, 벗어나면 원본 복귀.
+func _hover_swap(hot: Button, tex_path: String) -> void:
+	var variant := _res(tex_path) as Texture2D
+	hot.mouse_entered.connect(func() -> void:
+		if _desk_bg_rect != null and variant != null:
+			_desk_bg_rect.texture = variant)
+	hot.mouse_exited.connect(func() -> void:
+		if _desk_bg_rect != null and _desk_bg_default != null:
+			_desk_bg_rect.texture = _desk_bg_default)
 
 ## 데스크 핫스팟: 배경 위 특정 영역(모니터·서랍)을 투명 버튼으로 덮는다.
 ## r = 뷰포트 비율 (left, top, width, height). 평소 무투명, hover 시 반투명 회색 채움.
