@@ -78,7 +78,9 @@ var _tm: TurnManager
 var _desk: Control
 var _screen: Control
 var _os: Control
-var _block_checks: Array = []  # [{cb: CheckBox, id: String}]
+var _draft_ids: Array = []          # 이번 기사에 끌어다 놓은 블록 id (드래그앤드롭, 턴마다 초기화)
+var _folder_box: VBoxContainer      # 정보 폴더(파일 목록) 본문
+var _draft_box: VBoxContainer       # 원고 창 드롭 영역 본문
 var _comments_box: VBoxContainer
 var _needle: Line2D
 var _status_label: Label
@@ -86,7 +88,6 @@ var _turn_label: Label
 var _pub_button: Button
 var _pressure_label: Label
 var _branch_label: Label
-var _blocks_box: VBoxContainer
 var _desk_search_btn: Button
 var _desk_note: Label
 var _f16_shown: bool = false
@@ -121,6 +122,9 @@ var _mail_unread: int = 0
 var _neon_n: Label                  # 타이틀 네온사인의 점멸 글자(N)
 var _neon_rng := RandomNumberGenerator.new()
 var _taskbar_day: Label             # 태스크바 우측 "제 N 일" 표시
+var _day_stage: int = 0             # 턴 경과 카드 진행 단계(클릭으로 넘김)
+var _day_done: Callable             # 카드 종료 후 콜백
+var _day_busy: bool = false         # 페이드 중 클릭 무시
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -368,16 +372,18 @@ func _crt_power_on() -> void:
 		_transitioning = false
 		_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE)
 
-# ---------- 턴 경과 인터스티셜 ----------
+# ---------- 턴 경과 인터스티셜 (클릭으로 진행) ----------
 func _build_day_card() -> void:
 	_day_card = Control.new()
 	_day_card.name = "DayCard"
 	_day_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_day_card.visible = false
-	_day_card.mouse_filter = Control.MOUSE_FILTER_STOP  # 연출 중 클릭 차단
+	_day_card.mouse_filter = Control.MOUSE_FILTER_STOP  # 아래 UI 클릭 차단 + 카드 자체가 클릭 대상
+	_day_card.gui_input.connect(_day_card_input)
 	var bg := ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.94)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_day_card.add_child(bg)
 	_day_label = Label.new()
 	_day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -387,26 +393,53 @@ func _build_day_card() -> void:
 	_day_label.add_theme_font_size_override("font_size", 30)
 	_day_label.add_theme_color_override("font_color", Color(0.9, 0.82, 0.62))
 	_day_card.add_child(_day_label)
+	var hint := Label.new()
+	hint.name = "ClickHint"
+	hint.text = "— 클릭해서 계속 —"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	hint.offset_top = -70.0
+	hint.offset_bottom = -46.0
+	hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	hint.add_theme_color_override("font_color", Color(0.55, 0.52, 0.45))
+	_day_card.add_child(hint)
 	add_child(_day_card)
 
-## 발행 직후: "석간 마감 → 다음 날" 하루 경과를 한 장으로 보여준 뒤 done 을 호출한다.
+## 발행 직후: "석간 마감 → 다음 날" 카드. 자동으로 흐르지 않고 클릭할 때마다 진행된다.
 ## 엔딩 턴에는 쓰지 않는다(엔딩 오버레이가 우선).
 func _show_day_transition(done: Callable) -> void:
+	_day_done = done
+	_day_stage = 0
+	_day_busy = true
 	_day_label.text = "— 석간 마감. 윤전기가 돈다 —"
 	_day_card.modulate = Color(1, 1, 1, 0)
 	_day_card.visible = true
 	_day_card.move_to_front()
 	var tw := create_tween()
-	tw.tween_property(_day_card, "modulate:a", 1.0, 0.35)
-	tw.tween_interval(0.75)
-	tw.tween_callback(func() -> void:
+	tw.tween_property(_day_card, "modulate:a", 1.0, 0.3)
+	tw.tween_callback(func() -> void: _day_busy = false)
+
+func _day_card_input(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
+			and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_day_card_next()
+
+func _day_card_next() -> void:
+	if _day_busy or not _day_card.visible:
+		return
+	if _day_stage == 0:
+		_day_stage = 1
 		_day_label.text = "제 %d 일 아침  ·  표결까지 %d일" % [
-			_tm.model.turn + 1, maxi(_tm.max_turns - _tm.model.turn, 0)])
-	tw.tween_interval(0.95)
-	tw.tween_property(_day_card, "modulate:a", 0.0, 0.4)
-	tw.tween_callback(func() -> void:
-		_day_card.visible = false
-		done.call())
+			_tm.model.turn + 1, maxi(_tm.max_turns - _tm.model.turn, 0)]
+	else:
+		_day_busy = true
+		var tw := create_tween()
+		tw.tween_property(_day_card, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(func() -> void:
+			_day_card.visible = false
+			_day_busy = false
+			if _day_done.is_valid():
+				_day_done.call())
 
 ## 스크린 → 데스크: 짧은 암전 후 "모니터에서 물러나는" 줌 아웃.
 func _exit_screen() -> void:
@@ -431,6 +464,9 @@ func _exit_screen() -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_ESCAPE:
 		if _transitioning or (_title_view != null and _title_view.visible):
+			return
+		if _day_card != null and _day_card.visible:  # 턴 경과 카드는 ESC 로도 넘어간다
+			_day_card_next()
 			return
 		# ESC 는 열려 있는 오버레이부터 닫는다(기사 → 받은자료 → 설정 → 화면 전환).
 		if _article_panel != null and _article_panel.visible:
@@ -709,11 +745,12 @@ func _build_screen() -> void:
 	os.add_child(wallpaper)
 	_build_desktop_icons(os)
 	# 앱 창 (유리면 좌표계, 태스크바 34px 를 뺀 작업영역 안):
-	_windows["informant"] = _make_informant(Vector2(96, 8), Vector2(336, 288))
-	_windows["editor"] = _make_editor(Vector2(356, 8), Vector2(420, 554))
-	_windows["comments"] = _make_comments(Vector2(788, 8), Vector2(308, 400))
-	_windows["gauge"] = _make_gauge(Vector2(96, 304), Vector2(336, 252))
-	_windows["mail"] = _make_mail(Vector2(290, 76), Vector2(500, 400))
+	_windows["informant"] = _make_informant(Vector2(110, 8), Vector2(440, 300))
+	_windows["folder"] = _make_folder(Vector2(110, 314), Vector2(440, 248))
+	_windows["editor"] = _make_editor(Vector2(560, 8), Vector2(436, 554))
+	_windows["comments"] = _make_comments(Vector2(600, 84), Vector2(430, 430))
+	_windows["gauge"] = _make_gauge_widget(Vector2(880, 340))
+	_windows["mail"] = _make_mail(Vector2(280, 70), Vector2(520, 410))
 	for key in _windows:
 		var w := _windows[key] as PanelContainer
 		w.set_meta("app_key", key)
@@ -722,7 +759,7 @@ func _build_screen() -> void:
 	_build_taskbar(os)
 	# 첫 부팅: 의뢰 메일이 도착해 있고, 수신함이 열린 채 시작한다(온보딩).
 	_push_mail("산업위원회 (발신전용)", "의뢰 — 표결일까지",
-		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐社도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n※ [정보원]에서 오늘 입수한 사실을 확인하고 [원고]에서 기사를 발행할 것." % [
+		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐社도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n※ [정보원]에서 오늘 입수분을 확인 → [정보 폴더]의 파일을 [원고]로 끌어다 기사를 만들고 발행할 것." % [
 			_tm.max_turns, int(round(float(_tm.model.config["mission"]["winThreshold"]) * 100.0))])
 	_open_win("mail")
 	_build_settings_panel(os)
@@ -752,8 +789,8 @@ func _build_screen() -> void:
 
 # ---------- OS 태스크바 + 바탕화면 아이콘 ----------
 const APPS := [  # [key, 라벨, 아이콘 글리프]
-	["mail", "메일", "✉"], ["informant", "정보원", "☏"], ["editor", "원고", "✎"],
-	["comments", "댓글", "❝"], ["gauge", "여론계", "◉"],
+	["mail", "메일", "✉"], ["informant", "정보원", "☏"], ["folder", "정보 폴더", "▤"],
+	["editor", "원고", "✎"], ["comments", "댓글", "❝"], ["gauge", "여론계", "◉"],
 ]
 
 func _build_taskbar(parent: Control) -> void:
@@ -827,13 +864,13 @@ func _build_desktop_icons(parent: Control) -> void:
 		parent.add_child(lb)
 		y += 96.0
 
+## 태스크바 클릭: 닫힘/내려짐 → 열기, 열려 있으면 → 내리기(실제 OS 태스크바와 동일).
 func _toggle_win(key: String) -> void:
 	var w := _windows.get(key) as PanelContainer
 	if w == null:
 		return
 	if w.visible:
-		w.visible = false
-		_update_taskbar_state()
+		_close_window(w, true)
 	else:
 		_open_win(key)
 
@@ -854,26 +891,47 @@ func _open_win(key: String) -> void:
 		_update_mail_badge()
 	_update_taskbar_state()
 
-## 프레임의 X/— 히트박스가 부르는 닫기(=태스크바로 내리기).
-func _close_window(panel: PanelContainer) -> void:
+## 창 숨기기. minimized=true 면 「내려짐」(◌, 작업 유지 상태), false 면 「닫힘」.
+## 둘 다 태스크바에서 다시 열 수 있지만, 태스크바 표시가 다르다.
+func _close_window(panel: PanelContainer, minimized: bool = false) -> void:
 	panel.visible = false
+	panel.set_meta("minimized", minimized)
 	_update_taskbar_state()
 
-## 태스크바 버튼에 열림 상태 반영: 열린 앱은 밝게, 닫힌 앱은 어둡게.
+## 태스크바 상태 표기: ● 열림(밝음) / ◌ 내려짐(중간) / 표시 없음 닫힘(어둡게).
 func _update_taskbar_state() -> void:
 	for key in _dock_btns:
 		var b := _dock_btns[key] as Button
 		var w := _windows.get(key) as PanelContainer
-		var open := w != null and w.visible
-		b.modulate = Color(1, 1, 1) if open else Color(0.68, 0.72, 0.68)
-	_update_mail_badge()
+		if w == null:
+			continue
+		var label := _app_label(str(key))
+		if w.visible:
+			b.text = "● " + label
+			b.modulate = Color(1, 1, 1)
+		elif bool(w.get_meta("minimized", false)):
+			b.text = "◌ " + label
+			b.modulate = Color(0.85, 0.88, 0.82)
+		else:
+			b.text = label
+			b.modulate = Color(0.6, 0.64, 0.6)
+	_apply_mail_badge()
+
+func _app_label(key: String) -> String:
+	for app in APPS:
+		if str(app[0]) == key:
+			return str(app[1])
+	return key
+
+## 메일 미읽음 배지는 상태 표기 위에 덧입힌다(개수 + 주황 강조).
+func _apply_mail_badge() -> void:
+	var b := _dock_btns.get("mail") as Button
+	if b != null and _mail_unread > 0:
+		b.text += "(%d)" % _mail_unread
+		b.modulate = Color(1.0, 0.85, 0.6)
 
 func _update_mail_badge() -> void:
-	var b := _dock_btns.get("mail") as Button
-	if b != null:
-		b.text = "메일" if _mail_unread <= 0 else "메일(%d)" % _mail_unread
-		if _mail_unread > 0:
-			b.modulate = Color(1.0, 0.85, 0.6)
+	_update_taskbar_state()
 
 # ---------- 메일 앱 (편집장·압박·분기 메시지 수신함) ----------
 func _make_mail(pos: Vector2, size: Vector2) -> PanelContainer:
@@ -950,12 +1008,12 @@ func _window_gui_input(ev: InputEvent, panel: PanelContainer) -> void:
 			if mb.pressed:
 				panel.move_to_front()
 				# 프레임 아트에 그려진 창 버튼을 실제로 동작시킨다:
-				# 우상단(□·X) = 닫기 / 좌상단(—) = 내리기(같은 효과, 태스크바에서 다시 연다).
+				# 우상단(□·X) = 닫기 / 좌상단(—) = 내리기 — 태스크바 표기가 달라진다(●/◌/닫힘).
 				if mb.position.y <= 46.0 and mb.position.x >= panel.size.x - 88.0:
-					_close_window(panel)
+					_close_window(panel, false)
 					return
 				if mb.position.y <= 46.0 and mb.position.x <= 88.0:
-					_close_window(panel)
+					_close_window(panel, true)
 					return
 				if mb.position.y <= 64.0:  # 타이틀바(상단 브라스 두께) 영역만 드래그 시작
 					panel.set_meta("dragging", true)
@@ -966,6 +1024,19 @@ func _window_gui_input(ev: InputEvent, panel: PanelContainer) -> void:
 		var p: Vector2 = panel.position + (ev as InputEventMouseMotion).relative
 		p.x = clampf(p.x, -panel.size.x + 80.0, area.x - 80.0)
 		p.y = clampf(p.y, 0.0, area.y - 70.0)
+		panel.position = p
+
+## 크롬 없는 위젯(여론계)용 드래그: 전체가 손잡이, 닫기 존 없음(태스크바로만 내림).
+func _widget_drag_input(ev: InputEvent, panel: PanelContainer) -> void:
+	if ev is InputEventMouseButton and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		panel.set_meta("dragging", (ev as InputEventMouseButton).pressed)
+		if (ev as InputEventMouseButton).pressed:
+			panel.move_to_front()
+	elif ev is InputEventMouseMotion and bool(panel.get_meta("dragging", false)):
+		var area: Vector2 = (panel.get_parent() as Control).size
+		var p: Vector2 = panel.position + (ev as InputEventMouseMotion).relative
+		p.x = clampf(p.x, 0.0, area.x - panel.size.x)
+		p.y = clampf(p.y, 0.0, area.y - 40.0)
 		panel.position = p
 
 func _body_of(panel: Node) -> VBoxContainer:
@@ -1061,22 +1132,37 @@ func _refresh_informant() -> void:
 
 # 원고 작성: 각 문장 블록을 넣을지 말지 토글. 필수 없음. 전부 빼면 미보도.
 func _make_editor(pos: Vector2, size: Vector2) -> Control:
-	var panel := _window(pos, size, "원고 작성 — 실을 문장 선택", 20.0)
+	var panel := _window(pos, size, "원고 작성", 20.0)
 	var vb := _body_of(panel)
 	_turn_label = Label.new()
 	_turn_label.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
 	vb.add_child(_turn_label)
 	_update_turn_label()
 	var hint := Label.new()
-	hint.text = "실을 문장에 체크. 무엇을 넣고 빼느냐로 기사가 정해집니다."
+	hint.text = "[정보 폴더]의 파일을 이곳에 끌어다 놓아 기사를 구성합니다."
 	hint.modulate = Color(0.7, 0.75, 0.7)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(hint)
 
-	# 문장 블록은 사실이 늘수록 길어지므로 스크롤 영역에. 발행 버튼·상태 문구는
-	# 스크롤 밖(고정)에 둬서 항상 손이 닿게 한다.
-	_blocks_box = _scroll_body(vb)
-	_refresh_blocks()
+	# 드롭 영역: 원고지 느낌의 어두운 지면. 폴더 파일을 여기 떨어뜨리면 기사에 실린다.
+	var drop_zone := PanelContainer.new()
+	drop_zone.name = "DraftDropZone"
+	var dsb := StyleBoxFlat.new()
+	dsb.bg_color = Color(0.05, 0.045, 0.035)
+	dsb.border_color = Color(0.45, 0.38, 0.22)
+	dsb.set_border_width_all(1)
+	dsb.set_corner_radius_all(3)
+	dsb.set_content_margin_all(8)
+	drop_zone.add_theme_stylebox_override("panel", dsb)
+	drop_zone.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vb.add_child(drop_zone)
+	var inner_v := VBoxContainer.new()
+	drop_zone.add_child(inner_v)
+	_draft_box = _scroll_body(inner_v)
+	# 드롭 판정은 커서 바로 아래 컨트롤에 묻으므로, 영역을 이루는 층 전부에 포워딩을 건다.
+	for c: Control in [drop_zone, inner_v, _draft_box, _draft_box.get_parent()]:
+		_set_drop_target(c)
+	_refresh_draft()
 
 	var pub := Button.new()
 	pub.text = "발행"
@@ -1106,14 +1192,105 @@ func _make_editor(pos: Vector2, size: Vector2) -> Control:
 	vb.add_child(_branch_label)
 	return panel
 
-## 취사 가능한 문장 블록을 현재 상태(F15 발견·F16 개폐 반영)로 다시 그린다.
-func _refresh_blocks() -> void:
-	if _blocks_box == null:
+# ---------- 정보 폴더 (수집한 사실 = 파일) ----------
+func _make_folder(pos: Vector2, size: Vector2) -> PanelContainer:
+	var panel := _window(pos, size, "정보 폴더")
+	var vb := _body_of(panel)
+	var hint := Label.new()
+	hint.text = "파일을 [원고] 창으로 드래그 (더블클릭도 가능)"
+	hint.modulate = Color(0.7, 0.75, 0.7)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(hint)
+	_folder_box = _scroll_body(vb)
+	_refresh_blocks()
+	return panel
+
+## 현재 블록 목록에서 id 로 찾기. 없으면 빈 Dictionary.
+func _block_by_id(id: String) -> Dictionary:
+	for b in _tm.get_blocks():
+		if str(b["id"]) == id:
+			return b
+	return {}
+
+## 드래그 데이터 구성 + 종이 파일 모양 프리뷰.
+func _make_drag_data(source: Control, id: String, text: String) -> Dictionary:
+	var prev := Label.new()
+	prev.text = "▤ " + text.substr(0, 24) + ("…" if text.length() > 24 else "")
+	prev.add_theme_color_override("font_color", Color(0.1, 0.09, 0.06))
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.85, 0.8, 0.65, 0.95)  # 갱지
+	sb.set_content_margin_all(6)
+	var wrap := PanelContainer.new()
+	wrap.add_theme_stylebox_override("panel", sb)
+	wrap.add_child(prev)
+	source.set_drag_preview(wrap)
+	return {"type": "gireki_block", "id": id, "text": text}
+
+## 컨트롤을 원고 드롭 대상으로 만든다(드래그 소스는 아님).
+func _set_drop_target(c: Control) -> void:
+	c.set_drag_forwarding(
+		func(_p: Vector2) -> Variant: return null,
+		func(_p: Vector2, d: Variant) -> bool:
+			return d is Dictionary and str((d as Dictionary).get("type", "")) == "gireki_block",
+		func(_p: Vector2, d: Variant) -> void:
+			_add_to_draft(str((d as Dictionary).get("id", ""))))
+
+func _add_to_draft(id: String) -> void:
+	if id == "" or _draft_ids.has(id) or _block_by_id(id).is_empty():
 		return
-	for c in _blocks_box.get_children():
-		_blocks_box.remove_child(c)
+	_draft_ids.append(id)
+	_refresh_draft()
+	_refresh_blocks()  # 폴더 쪽에 '원고에 실림' 표시 갱신
+
+func _remove_from_draft(id: String) -> void:
+	_draft_ids.erase(id)
+	_refresh_draft()
+	_refresh_blocks()
+
+## 원고(드롭 영역)를 현재 _draft_ids 로 다시 그린다. 비면 안내 문구.
+func _refresh_draft() -> void:
+	if _draft_box == null:
+		return
+	for c in _draft_box.get_children():
+		_draft_box.remove_child(c)
 		c.free()
-	_block_checks.clear()
+	if _draft_ids.is_empty():
+		var empty := Label.new()
+		empty.text = "(빈 원고)\n\n정보 폴더의 파일을 여기로 끌어오세요.\n아무것도 싣지 않고 발행하면 미보도가 됩니다."
+		empty.modulate = Color(0.5, 0.5, 0.45)
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_draft_box.add_child(empty)
+		return
+	var facts: Dictionary = _tm.content.get("facts", {})
+	for id in _draft_ids:
+		var b := _block_by_id(str(id))
+		if b.is_empty():
+			continue
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 드롭 판정이 행에 막히지 않게
+		var lb := Label.new()
+		var fid: String = str(b["fact"])
+		lb.text = "▤ [%s] %s" % [str((facts.get(fid, {}) as Dictionary).get("title", fid)), str(b["text"])]
+		lb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(lb)
+		var x := Button.new()
+		x.text = "✕"
+		x.tooltip_text = "원고에서 빼기"
+		x.custom_minimum_size = Vector2(30, 26)
+		x.pressed.connect(_remove_from_draft.bind(str(id)))
+		row.add_child(x)
+		_draft_box.add_child(row)
+
+## 정보 폴더를 현재 상태(오늘 입수 + 이월 + F15 발견·F16 개폐)로 다시 그린다.
+## 파일 은유: 사실별 그룹 아래 문장 1개 = 파일 1개. 드래그 소스.
+func _refresh_blocks() -> void:
+	if _folder_box == null:
+		return
+	for c in _folder_box.get_children():
+		_folder_box.remove_child(c)
+		c.free()
 	var facts: Dictionary = _tm.content.get("facts", {})
 	var cur_turn: int = _cur_turn()
 	var last_fact := ""
@@ -1122,7 +1299,7 @@ func _refresh_blocks() -> void:
 		var fid: String = str(b["fact"])
 		var fdict: Dictionary = facts.get(fid, {})
 		var is_today: bool = _is_today_fact(fdict, cur_turn)
-		# 원고에는 오늘 것 + 「받은 자료」에서 끌어온 과거 사실만 노출(난잡·과부하 방지).
+		# 폴더에는 오늘 것 + 「받은 자료」에서 끌어온 과거 사실만(난잡·과부하 방지).
 		if not is_today and not _carryover_selected.has(fid):
 			continue
 		shown_any = true
@@ -1133,18 +1310,32 @@ func _refresh_blocks() -> void:
 			fh.text = "%s[%s]" % [mark, str(fdict.get("title", fid))]
 			fh.add_theme_color_override("font_color",
 				Color(1.0, 0.85, 0.4) if is_today else Color(0.7, 0.8, 0.95))
-			_blocks_box.add_child(fh)
-		var cb := CheckBox.new()
-		cb.text = str(b["text"])
-		cb.button_pressed = true
-		_blocks_box.add_child(cb)
-		_block_checks.append({"cb": cb, "id": str(b["id"])})
+			_folder_box.add_child(fh)
+		var id := str(b["id"])
+		var text := str(b["text"])
+		var file_btn := Button.new()
+		file_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		file_btn.clip_text = true
+		var in_draft := _draft_ids.has(id)
+		file_btn.text = ("✓ " if in_draft else "▤ ") + text
+		file_btn.disabled = in_draft  # 이미 실린 파일은 회색 처리
+		file_btn.tooltip_text = "원고 창으로 드래그해서 싣기" if not in_draft else "이미 원고에 실림"
+		file_btn.set_drag_forwarding(
+			(func(_p: Vector2) -> Variant: return _make_drag_data(file_btn, id, text))
+				if not in_draft else (func(_p: Vector2) -> Variant: return null),
+			func(_p: Vector2, _d: Variant) -> bool: return false,
+			func(_p: Vector2, _d: Variant) -> void: pass)
+		if not in_draft:
+			file_btn.gui_input.connect(func(ev: InputEvent) -> void:
+				if ev is InputEventMouseButton and (ev as InputEventMouseButton).double_click:
+					_add_to_draft(id))
+		_folder_box.add_child(file_btn)
 	if not shown_any:
 		var none := Label.new()
-		none.text = "실을 문장이 없습니다. 「받은 자료」에서 과거 정보를 끌어올 수 있습니다."
+		none.text = "수집된 정보가 없습니다. [정보원]에서 오늘 입수분을 확인하거나\n「받은 자료」에서 과거 정보를 끌어올 수 있습니다."
 		none.modulate = Color(0.65, 0.65, 0.6)
 		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		_blocks_box.add_child(none)
+		_folder_box.add_child(none)
 
 func _make_comments(pos: Vector2, size: Vector2) -> Control:
 	var panel := _window(pos, size, "댓글")
@@ -1155,15 +1346,21 @@ func _make_comments(pos: Vector2, size: Vector2) -> Control:
 	_comments_box.add_child(hint)
 	return panel
 
-func _make_gauge(pos: Vector2, size: Vector2) -> Control:
-	var panel := _window(pos, size, "여론 게이지 (거시·부정확)")
-	var vb := _body_of(panel)
+## 여론계: 창 크롬 없이 게이지 아트만 바탕화면에 놓이는 위젯. 드래그로 옮길 수 있고
+## 태스크바 [여론계] 로 내리고 올린다.
+func _make_gauge_widget(pos: Vector2) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.position = pos
+	panel.custom_minimum_size = Vector2(210, 220)
+	panel.size = Vector2(210, 220)
+	panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())  # 크롬 없음
+	# 위젯 전체가 드래그 손잡이(창 프레임의 X/— 존은 없음).
+	panel.gui_input.connect(_widget_drag_input.bind(panel))
 	var dial := Control.new()
-	# 여백이 커진 만큼(상64·하48) 다이얼 최소 높이를 줄여 창이 아래로 밀려 커지지 않게 한다.
-	dial.custom_minimum_size = Vector2(0, 120)
+	dial.custom_minimum_size = Vector2(0, 200)
 	dial.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	dial.clip_contents = true
-	vb.add_child(dial)
+	panel.add_child(dial)
 	var tex := _res(GAUGE_TEX)
 	if tex != null:
 		var tr := TextureRect.new()
@@ -1217,12 +1414,14 @@ func _process(_delta: float) -> void:
 
 # ---------- 발행 ----------
 func _on_publish() -> void:
+	# 원고 = 드롭해 둔 블록들. 빈 원고 발행 = 미보도.
 	var included: Array = []
 	var included_texts: Array = []
-	for entry in _block_checks:
-		if (entry["cb"] as CheckBox).button_pressed:
-			included.append(entry["id"])
-			included_texts.append((entry["cb"] as CheckBox).text)  # 본문 조립용(발행 전 캡처)
+	for id in _draft_ids:
+		var b := _block_by_id(str(id))
+		if not b.is_empty():
+			included.append(str(id))
+			included_texts.append(str(b["text"]))  # 본문 조립용(발행 전 캡처)
 	var pub_turn: int = _tm.model.turn + 1  # 발행 대상 턴(publish 가 턴을 올리기 전)
 	var det_before: int = _tm.model.detections.size()
 	var result := _tm.publish({"included_ids": included})
@@ -1262,8 +1461,10 @@ func _on_publish() -> void:
 	else:
 		_update_turn_label()
 		_carryover_selected.clear()  # 새 턴 = 새 기사: 지난 기사에 끌어온 과거 정보는 초기화
+		_draft_ids.clear()           # 원고도 백지에서 시작
 		_refresh_informant()  # 이번 턴 오늘 입수 + 받은 자료 개수 갱신
-		_refresh_blocks()     # 원고 창 = 새 턴 오늘 블록
+		_refresh_blocks()     # 정보 폴더 = 새 턴 오늘 파일
+		_refresh_draft()
 		if _archive_panel != null and _archive_panel.visible:
 			_refresh_archive()
 		# 하루 경과 연출 → 기사 지면 팝 + 여론(댓글) 창 자동 오픈.
