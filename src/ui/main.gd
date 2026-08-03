@@ -1451,7 +1451,7 @@ func _make_gauge_widget(pos: Vector2) -> PanelContainer:
 	# resized 에 연결한다. 하드코딩 좌표를 쓰면 창 치수를 조금만 건드려도 어긋난다.
 	dial.resized.connect(func() -> void: _fit_needle(dial))
 	_fit_needle(dial)
-	_set_needle(0.5)
+	_set_needle(0.5, 0.5)  # 시작: 바늘 수직 + 부동층 0.5 = 관 2.5개
 	return panel
 
 ## KEEP_ASPECT_CENTERED 로 그려진 정사각 텍스처 안에서 다이얼 축 위치를 계산해
@@ -1472,18 +1472,27 @@ func _fit_needle(dial: Control) -> void:
 
 ## 바늘은 즉시 꺾이지 않는다 — 목표각까지 무겁게 스윙 후 살짝 오버슈트(아날로그 계기).
 ## 실제 회전은 _process 에서 base + 상시 미세 떨림으로 합성한다(세계관: 부정확한 바늘).
-## 갱신 직후엔 동요(_needle_excite)로 떨림이 커졌다가 가라앉고, 닉시관 점등 수도 갱신된다.
-func _set_needle(macro: float) -> void:
+## 갱신 직후엔 동요(_needle_excite)로 떨림이 커졌다가 가라앉는다.
+##
+## 계기 이원화(플레이테스트 피드백 — 변화가 안 보임):
+##  · 바늘   = 거시 여론(tvMacro). 실변동이 ±0.1 수준으로 작아 3배 증폭해 표시
+##             (수치 비표시 원칙이라 과장은 허용 — '부정확한 계기'다).
+##  · 닉시관 = 미션 바로미터: SNS 부동층 온도. [0.30~0.70]→0~5관 리맵이라
+##             턴마다 관 단위로 움직인다. 승리선(0.65)≈4.4관.
+func _set_needle(macro: float, swing: float = -1.0) -> void:
 	if _needle == null:
 		return
-	var target: float = deg_to_rad((macro - 0.5) * 120.0)  # 0.5=수직, 우=찬성, 좌=반대
+	var dev: float = clampf((macro - 0.5) * 3.0, -0.55, 0.55)
+	var target: float = deg_to_rad(dev * 110.0)  # 0.5=수직, 우=찬성, 좌=반대
 	_needle_excite = 1.0  # 새 여론 반영 = 계기가 크게 흔들린다
 	var tw := create_tween()
 	tw.tween_property(self, "_needle_rot_base", target, 1.4) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	# 닉시관: macro(0~1) × 5 개. 경계 관은 반쯤 밝아져 미세 변화도 보인다.
+	if swing < 0.0:
+		return
+	var level: float = clampf(remap(swing, 0.30, 0.70, 0.0, 5.0), 0.0, 5.0)
 	for i in _tube_dims.size():
-		var lit: float = clampf(macro * 5.0 - float(i), 0.0, 1.0)
+		var lit: float = clampf(level - float(i), 0.0, 1.0)
 		var dtw := create_tween()
 		dtw.tween_property(_tube_dims[i], "color:a", lerpf(0.62, 0.0, lit), 0.9) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -1516,8 +1525,8 @@ func _on_publish() -> void:
 		distortion_detected.emit()  # 이번 턴에 왜곡이 새로 들통났다
 	_render_comments(result["comments"])
 	var snap: Dictionary = result["snapshot"]
-	_set_needle(float(snap["tvMacro"]))
 	var swing: float = float(snap["xs"]["sns_swing"])
+	_set_needle(float(snap["tvMacro"]), swing)
 	var reported: Array = result["reported_facts"]
 	if not reported.is_empty():
 		_article_history.append({
