@@ -95,6 +95,7 @@ var _pub_button: Button
 var _pressure_label: Label
 var _branch_label: Label
 var _desk_search_btn: Button
+var _desk_fx: Control            # desk_fx.tscn 인스턴스(화면 발광·서랍 그림자 — 에디터 튜닝)
 var _desk_note: Label
 var _f16_shown: bool = false
 var _informant_body: VBoxContainer  # 정보원 패널 스크롤 본문(턴별 갱신 대상)
@@ -171,11 +172,6 @@ func _build_title() -> void:
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.add_theme_constant_override("separation", 12)
 	_title_view.add_child(box)
-	var date_line := Label.new()
-	date_line.text = "아이젠 공화국 · 치차  |  노동 근대화법 표결 8일 전"
-	date_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	date_line.add_theme_color_override("font_color", Color(0.5, 0.5, 0.56))
-	box.add_child(date_line)
 	# 네온 표지판: 어두운 금속판 위에 글자별 네온관. N(TITLE_FLICKER_IDX)만 지직거리며,
 	# 꺼진 순간 GUIDE / LI E — 'LIE' 가 드러난다.
 	var sign := PanelContainer.new()
@@ -205,26 +201,33 @@ func _build_title() -> void:
 	var sign_wrap := CenterContainer.new()
 	sign_wrap.add_child(sign)
 	box.add_child(sign_wrap)
-	var sub := Label.new()
-	sub.text = TITLE_SUB
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.add_theme_font_size_override("font_size", 20)
-	sub.add_theme_color_override("font_color", Color(0.62, 0.58, 0.48))
-	box.add_child(sub)
-	var pad := Control.new()
-	pad.custom_minimum_size = Vector2(0, 16)
-	box.add_child(pad)
-	var start := _desk_button("출근한다", 52)
-	start.name = "StartButton"
-	start.pressed.connect(_start_game)
-	var wrap := CenterContainer.new()
-	wrap.add_child(start)
-	box.add_child(wrap)
-	var hint := Label.new()
-	hint.text = "무엇을 싣고, 무엇을 뺄 것인가."
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_color_override("font_color", Color(0.45, 0.44, 0.4))
-	box.add_child(hint)
+	# 타이틀 외 요소(부제·안내 문구·시작 버튼)는 모두 제거. 화면 아무 곳이나 클릭하면 시작.
+	var starter := Button.new()
+	starter.flat = true
+	starter.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var _empty := StyleBoxEmpty.new()
+	starter.add_theme_stylebox_override("normal", _empty)
+	starter.add_theme_stylebox_override("hover", _empty)
+	starter.add_theme_stylebox_override("pressed", _empty)
+	starter.add_theme_stylebox_override("focus", _empty)
+	starter.pressed.connect(_start_game)
+	_title_view.add_child(starter)
+	# 하단 안내 문구(회색 소글씨) — 클릭 유도.
+	var click_hint := Label.new()
+	click_hint.text = "화면을 클릭하여 게임 시작"
+	click_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	click_hint.add_theme_font_size_override("font_size", 16)
+	click_hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
+	click_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	click_hint.anchor_left = 0.0
+	click_hint.anchor_right = 1.0
+	click_hint.anchor_top = 0.90
+	click_hint.anchor_bottom = 0.96
+	click_hint.offset_left = 0.0
+	click_hint.offset_right = 0.0
+	click_hint.offset_top = 0.0
+	click_hint.offset_bottom = 0.0
+	_title_view.add_child(click_hint)
 	box.modulate = Color(1, 1, 1, 0)
 	var tw := create_tween()
 	tw.tween_property(box, "modulate:a", 1.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -301,22 +304,64 @@ func _build_desk() -> void:
 		_desk.add_child(cr)
 	_desk.add_child(bg)
 
-	var box := VBoxContainer.new()
-	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	box.add_theme_constant_override("separation", 10)
-	_desk.add_child(box)
-	var btn := _desk_button("모니터 켜기", 56)
-	btn.name = "MonitorButton"
-	btn.pressed.connect(_enter_screen)
-	box.add_child(btn)
-	_desk_search_btn = _desk_button("책상 뒤지기", 44)
-	_desk_search_btn.pressed.connect(_search_desk)
-	box.add_child(_desk_search_btn)
+	# hover 효과(화면 발광·서랍 그림자)는 에디터 편집용 씬으로 분리 → desk_fx.tscn.
+	# 색·강도·위치는 그 씬을 Godot 에디터에서 열어 조절한다(코드 수정 불필요).
+	var fx_ps: PackedScene = _res("res://scenes/desk_fx.tscn") as PackedScene
+	if fx_ps != null:
+		_desk_fx = fx_ps.instantiate()
+		_desk.add_child(_desk_fx)
+
+	# 버튼을 없애고, 배경의 모니터/책상 하단부 자체를 클릭 영역(핫스팟)으로 쓴다.
+	# hover 시 desk_fx 효과가 켜지고, 클릭 시 진입/책상 뒤지기.
+	# 좌표는 desk_bg.png(1152×648, 뷰포트와 1:1) 실측. TV 중심 (0.51,0.35)=MONITOR_FOCUS 검증.
+	var monitor_hot := _desk_hotspot(Rect2(0.339, 0.081, 0.320, 0.559))  # CRT 모니터 · 좌 -5px·우 -30px·위 -20px
+	monitor_hot.name = "MonitorHotspot"
+	monitor_hot.pressed.connect(_enter_screen)
+	monitor_hot.mouse_entered.connect(func() -> void: if _desk_fx: _desk_fx.set_screen_on(true))
+	monitor_hot.mouse_exited.connect(func() -> void: if _desk_fx: _desk_fx.set_screen_on(false))
+	_desk.add_child(monitor_hot)
+	var drawer_hot := _desk_hotspot(Rect2(0.03, 0.82, 0.94, 0.175))  # 책상 하단부(서랍 전면)
+	drawer_hot.name = "DrawerHotspot"
+	drawer_hot.pressed.connect(_search_desk)
+	drawer_hot.mouse_entered.connect(func() -> void: if _desk_fx: _desk_fx.set_drawer_open(true))
+	drawer_hot.mouse_exited.connect(func() -> void: if _desk_fx: _desk_fx.set_drawer_open(false))
+	_desk.add_child(drawer_hot)
 	_desk_note = Label.new()
-	_desk_note.add_theme_color_override("font_color", Color(0.7, 0.85, 0.7))
+	_desk_note.add_theme_color_override("font_color", Color(0.85, 0.9, 0.78))
 	_desk_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_desk_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(_desk_note)
+	_desk_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_desk_note.anchor_left = 0.15
+	_desk_note.anchor_right = 0.85
+	_desk_note.anchor_top = 0.70
+	_desk_note.anchor_bottom = 0.78
+	_desk_note.offset_left = 0.0
+	_desk_note.offset_right = 0.0
+	_desk_note.offset_top = 0.0
+	_desk_note.offset_bottom = 0.0
+	_desk.add_child(_desk_note)
+
+## 데스크 핫스팟: 배경 위 특정 영역(모니터·서랍)을 투명 버튼으로 덮는다.
+## r = 뷰포트 비율 (left, top, width, height). 평소 무투명, hover 시 반투명 회색 채움.
+func _desk_hotspot(r: Rect2) -> Button:
+	var b := Button.new()
+	# ⚠ flat=true 면 Button 이 어떤 StyleBox 도 그리지 않아 hover 테두리가 안 보인다.
+	# flat 은 끄고 normal 만 StyleBoxEmpty(투명) → hover 시 테두리 stylebox 가 정상 렌더.
+	b.anchor_left = r.position.x
+	b.anchor_top = r.position.y
+	b.anchor_right = r.position.x + r.size.x
+	b.anchor_bottom = r.position.y + r.size.y
+	b.offset_left = 0.0
+	b.offset_top = 0.0
+	b.offset_right = 0.0
+	b.offset_bottom = 0.0
+	# hover 피드백은 이제 desk_fx 오버레이(화면 발광·서랍 그림자)가 담당 → 버튼 자체는 무투명.
+	var empty := StyleBoxEmpty.new()
+	b.add_theme_stylebox_override("normal", empty)
+	b.add_theme_stylebox_override("hover", empty)
+	b.add_theme_stylebox_override("pressed", empty)
+	b.add_theme_stylebox_override("focus", empty)
+	return b
 
 ## 데스크 버튼: 기본 테마의 반투명 회색 패널은 디젤펑크 배경과 톤이 어긋난다.
 ## 황동 테두리 + 어두운 바켈라이트 면으로 스타일 가이드(§2 재질)에 맞춘다.
@@ -676,8 +721,6 @@ func _search_desk() -> void:
 		_refresh_blocks()
 		_refresh_informant()  # F15 단서가 정보원 패널에도 등장
 		_desk_rummage_fx("책상 CRT 수신함에서 형 테오의 흔적을 찾았다. (원고에 추가됨)", true)
-		if _desk_search_btn != null:
-			_desk_search_btn.disabled = true
 	else:
 		_desk_rummage_fx("책상엔 더 뒤질 게 없다.", false)
 
