@@ -8,6 +8,11 @@ const DESK_BG := "res://assets/art/ui/main/desk_bg.png"
 const GAUGE_TEX := "res://assets/art/ui/gauge/opinion_needle.png"
 const WINDOW_FRAME := "res://assets/art/ui/window/frame.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
+# 책상 뒤지기 클로즈업(선택 에셋): 이미지가 들어오면 자동 사용, 없으면 텍스트 연출만.
+const DESK_SEARCH_TEX := "res://assets/art/ui/main/desk_search_closeup.png"
+# 데스크 배경에서 모니터 화면의 중심(뷰포트 비율). 줌 인 트랜지션의 초점.
+# 현 desk_bg.png 실측: 브라운관 유리면 중심 ≈ (0.51, 0.35).
+const MONITOR_FOCUS := Vector2(0.51, 0.35)
 const SETTINGS_PATH := "user://settings.cfg"  # 사운드 볼륨 등 사용자 설정 저장
 
 ## 댓글 작성자 핸들 풀 — 세그먼트 페르소나(설계 §4·§5)에 맞춘 디젤펑크 톤.
@@ -93,6 +98,10 @@ var _carryover_selected: Array = [] # 「받은 자료」에서 이번 기사에
 var _archive_panel: PanelContainer  # 「받은 자료」 오버레이(과거 정보 열람·선별)
 var _archive_body: VBoxContainer
 var _archive_btn: Button            # 정보원 패널의 「받은 자료」 버튼(개수 표시)
+var _fade_rect: ColorRect           # 데스크↔스크린 트랜지션용 암전 오버레이(최상단)
+var _transitioning: bool = false    # 트랜지션 중 입력 무시(중복 클릭·ESC 연타 방지)
+var _crt_mat: ShaderMaterial        # CRT 셰이더(파워온 연출에서 파라미터 트윈)
+var _needle_rot_base: float = 0.0   # 바늘 목표 회전(트윈 대상). 실제 회전 = base + 떨림
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -102,6 +111,13 @@ func _ready() -> void:
 	_build_desk()
 	_build_screen()
 	_screen.visible = false
+	# 트랜지션 암전막: 항상 최상단(CRT 포함 모든 것 위). 평소엔 투명+클릭 통과.
+	_fade_rect = ColorRect.new()
+	_fade_rect.name = "TransitionFade"
+	_fade_rect.color = Color(0, 0, 0, 0)
+	_fade_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fade_rect)
 
 func _res(path: String) -> Resource:
 	return load(path) if ResourceLoader.exists(path) else null
@@ -180,17 +196,80 @@ func _desk_button(label: String, height: int) -> Button:
 	b.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.66))
 	return b
 
+## 모니터 클릭 → 화면 컷 전환 대신 "모니터로 들어가는" 줌 인:
+## 데스크를 모니터 초점(MONITOR_FOCUS) 기준으로 확대하며 암전 → CRT 파워온.
 func _enter_screen() -> void:
-	_desk.visible = false
-	_screen.visible = true
-	monitor_powered.emit()
+	if _transitioning or (_screen != null and _screen.visible):
+		return
+	_transitioning = true
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # 전환 중 클릭 차단
+	_desk.pivot_offset = get_viewport_rect().size * MONITOR_FOCUS
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_desk, "scale", Vector2(2.1, 2.1), 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(_fade_rect, "color:a", 1.0, 0.45) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(func() -> void:
+		_desk.visible = false
+		_desk.scale = Vector2.ONE
+		_screen.visible = true
+		monitor_powered.emit()
+		_crt_power_on())
 
+## CRT 파워온: 암전에서 밝아지며 2번 깜빡 + 스캔라인·색수차가 과했다가 정상치로 안정.
+func _crt_power_on() -> void:
+	_screen.modulate = Color(1, 1, 1, 0)
+	var tw := create_tween()
+	tw.tween_property(_fade_rect, "color:a", 0.0, 0.12)
+	tw.parallel().tween_property(_screen, "modulate:a", 0.85, 0.08)
+	tw.tween_property(_screen, "modulate:a", 0.25, 0.06)
+	tw.tween_property(_screen, "modulate:a", 1.0, 0.16)
+	if _crt_mat != null:
+		_crt_mat.set_shader_parameter("scanline_strength", 0.85)
+		_crt_mat.set_shader_parameter("aberration", 0.012)
+		tw.parallel().tween_method(func(v: float) -> void:
+			_crt_mat.set_shader_parameter("scanline_strength", lerpf(0.85, 0.25, v))
+			_crt_mat.set_shader_parameter("aberration", lerpf(0.012, 0.002, v)),
+			0.0, 1.0, 0.55)
+	tw.tween_callback(func() -> void:
+		_transitioning = false
+		_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE)
+
+## 스크린 → 데스크: 짧은 암전 후 "모니터에서 물러나는" 줌 아웃.
 func _exit_screen() -> void:
-	_screen.visible = false
-	_desk.visible = true
+	if _transitioning or (_desk != null and _desk.visible):
+		return
+	_transitioning = true
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	var tw := create_tween()
+	tw.tween_property(_fade_rect, "color:a", 1.0, 0.18)
+	tw.tween_callback(func() -> void:
+		_screen.visible = false
+		_desk.visible = true
+		_desk.pivot_offset = get_viewport_rect().size * MONITOR_FOCUS
+		_desk.scale = Vector2(1.6, 1.6))
+	tw.tween_property(_desk, "scale", Vector2.ONE, 0.4) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(_fade_rect, "color:a", 0.0, 0.3)
+	tw.tween_callback(func() -> void:
+		_transitioning = false
+		_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_ESCAPE:
+		if _transitioning:
+			return
+		# ESC 는 열려 있는 오버레이부터 닫는다(기사 → 받은자료 → 설정 → 화면 전환).
+		if _article_panel != null and _article_panel.visible:
+			_article_panel.visible = false
+			return
+		if _archive_panel != null and _archive_panel.visible:
+			_archive_panel.visible = false
+			return
+		if _settings_panel != null and _settings_panel.visible:
+			_settings_panel.visible = false
+			return
 		if _screen != null and _screen.visible:
 			_exit_screen()
 		elif _desk != null and _desk.visible:
@@ -371,15 +450,47 @@ func _toggle_carryover(fid: String) -> void:
 	_refresh_archive()  # 버튼 라벨 갱신
 
 func _search_desk() -> void:
+	if _transitioning:
+		return
 	if _tm.discover_theo():
 		clue_found.emit()
 		_refresh_blocks()
 		_refresh_informant()  # F15 단서가 정보원 패널에도 등장
-		_desk_note.text = "책상 CRT 수신함에서 형 테오의 흔적을 찾았다. (원고에 추가됨)"
+		_desk_rummage_fx("책상 CRT 수신함에서 형 테오의 흔적을 찾았다. (원고에 추가됨)", true)
 		if _desk_search_btn != null:
 			_desk_search_btn.disabled = true
 	else:
-		_desk_note.text = "책상엔 더 뒤질 게 없다."
+		_desk_rummage_fx("책상엔 더 뒤질 게 없다.", false)
+
+## 책상 뒤지기 연출: 서랍 쪽으로 시선이 쏠리는 살짝 줌 + 노트 타자기 출력.
+## 클로즈업 이미지(DESK_SEARCH_TEX)가 들어오면 발견 시 잠깐 띄운다(에셋 수급 대비 훅).
+func _desk_rummage_fx(note: String, found: bool) -> void:
+	# 아래쪽(서랍)으로 훅 들어갔다 나오는 카메라 느낌.
+	_desk.pivot_offset = get_viewport_rect().size * Vector2(0.5, 0.85)
+	var tw := create_tween()
+	tw.tween_property(_desk, "scale", Vector2(1.12, 1.12), 0.16) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_desk, "scale", Vector2.ONE, 0.22) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	# 노트는 타자기처럼 한 글자씩.
+	_desk_note.text = note
+	_desk_note.visible_ratio = 0.0
+	tw.parallel().tween_property(_desk_note, "visible_ratio", 1.0, note.length() * 0.03)
+	# 발견 + 클로즈업 에셋이 있으면 서랍 클로즈업을 2초 보여준다.
+	var closeup := _res(DESK_SEARCH_TEX)
+	if found and closeup is Texture2D:
+		var shot := TextureRect.new()
+		shot.texture = closeup
+		shot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		shot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		shot.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		shot.modulate = Color(1, 1, 1, 0)
+		_desk.add_child(shot)
+		var stw := create_tween()
+		stw.tween_property(shot, "modulate:a", 1.0, 0.25)
+		stw.tween_interval(2.0)
+		stw.tween_property(shot, "modulate:a", 0.0, 0.35)
+		stw.tween_callback(shot.queue_free)
 
 # ---------- 스크린 상태 (CRT OS) ----------
 func _build_screen() -> void:
@@ -435,6 +546,7 @@ func _build_screen() -> void:
 		var mat := ShaderMaterial.new()
 		mat.shader = sh
 		crt.material = mat
+		_crt_mat = mat  # 파워온 연출에서 스캔라인·색수차 파라미터를 트윈
 	_screen.add_child(crt)
 
 func _window(pos: Vector2, size: Vector2, title: String, extra_top: float = 0.0) -> PanelContainer:
@@ -703,9 +815,23 @@ func _fit_needle(dial: Control) -> void:
 	_needle.position = Vector2(ox + s * 0.50, oy + s * 0.35)
 	_needle.points = PackedVector2Array([Vector2.ZERO, Vector2(0, -s * 0.20)])
 
+## 바늘은 즉시 꺾이지 않는다 — 목표각까지 무겁게 스윙 후 살짝 오버슈트(아날로그 계기).
+## 실제 회전은 _process 에서 base + 상시 미세 떨림으로 합성한다(세계관: 부정확한 바늘).
 func _set_needle(macro: float) -> void:
-	if _needle != null:
-		_needle.rotation = deg_to_rad((macro - 0.5) * 120.0)  # 0.5=수직, 우=찬성, 좌=반대
+	if _needle == null:
+		return
+	var target: float = deg_to_rad((macro - 0.5) * 120.0)  # 0.5=수직, 우=찬성, 좌=반대
+	var tw := create_tween()
+	tw.tween_property(self, "_needle_rot_base", target, 1.4) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _process(_delta: float) -> void:
+	if _needle == null or _screen == null or not _screen.visible:
+		return
+	# 두 사인파 합성으로 불규칙해 보이는 미세 진동(±0.9°). 난수 대신 사인이라 결정론적·저비용.
+	var t: float = Time.get_ticks_msec() / 1000.0
+	var jitter: float = deg_to_rad(0.55) * sin(t * 7.3) + deg_to_rad(0.35) * sin(t * 13.7)
+	_needle.rotation = _needle_rot_base + jitter
 
 # ---------- 발행 ----------
 func _on_publish() -> void:
@@ -835,11 +961,21 @@ func _article_next() -> void:
 		_refresh_article_view()
 
 ## 발행 기사 오버레이를 연다(발행 자동 + "다시 보기" 버튼). 현재 인덱스 기사를 보여준다.
+## 신문이 책상에 놓이듯 살짝 커지며 등장(팝 인).
 func _show_article() -> void:
-	if _article_panel != null:
-		_refresh_article_view()
-		_article_panel.visible = true
-		_article_panel.move_to_front()
+	if _article_panel == null:
+		return
+	_refresh_article_view()
+	_article_panel.visible = true
+	_article_panel.move_to_front()
+	_article_panel.pivot_offset = _article_panel.size * 0.5
+	_article_panel.scale = Vector2(0.92, 0.92)
+	_article_panel.modulate = Color(1, 1, 1, 0)
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_article_panel, "scale", Vector2.ONE, 0.22) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_article_panel, "modulate:a", 1.0, 0.16)
 
 ## prose 문단의 첫 문장만 뽑는다(보조 사실 요약용). "다." 로 끝나는 첫 문장 기준.
 func _first_sentence(s: String) -> String:
@@ -942,6 +1078,11 @@ func _show_ending(ending: String, epi: String = "") -> void:
 		vb.add_child(epi_label)
 	if _os != null:
 		_os.add_child(panel)
+		# 엔딩은 갑자기 박히지 않고 무겁게 떠오른다(페이드 + 미세 상승).
+		panel.modulate = Color(1, 1, 1, 0)
+		var tw := create_tween()
+		tw.tween_property(panel, "modulate:a", 1.0, 0.8) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 ## 세그먼트 페르소나에 맞는 랜덤 핸들. 같은 base 도 숫자 접미(약 70%)로 변주.
 func _comment_handle(seg: String) -> String:
@@ -975,6 +1116,10 @@ func _render_comments(comments: Array) -> void:
 		none.modulate = Color(0.6, 0.6, 0.6)
 		_comments_box.add_child(none)
 		return
+	# 댓글이 "실시간으로 달리는" 느낌: 한꺼번에 뜨지 않고 0.35초 간격으로 순차 등장.
+	var tw := create_tween()
+	tw.set_parallel(true)
+	var i: int = 0
 	for c in comments:
 		var row := VBoxContainer.new()
 		var handle := Label.new()
@@ -988,4 +1133,7 @@ func _render_comments(comments: Array) -> void:
 		var spacer := Control.new()
 		spacer.custom_minimum_size = Vector2(0, 6)
 		row.add_child(spacer)
+		row.modulate = Color(1, 1, 1, 0)
 		_comments_box.add_child(row)
+		tw.tween_property(row, "modulate:a", 1.0, 0.3).set_delay(0.15 + i * 0.35)
+		i += 1
