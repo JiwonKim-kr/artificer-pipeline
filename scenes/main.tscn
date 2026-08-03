@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=20 format=3]
 
 ; 「태엽 인간」 1턴 수직 슬라이스 진입 씬. 루트 Main(Control)에 src/ui/main.gd 가
 ; 데스크→모니터 클릭→CRT OS UI 를 구성한다. spec: docs/specs/turn_loop_vertical_slice.md
@@ -14,6 +14,14 @@
 [ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/ending.ogg" id="9_se_stream"]
 [ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="10_se_emitter"]
 [ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/clue_found.ogg" id="11_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="12_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/window_open.ogg" id="13_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="14_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/window_close.ogg" id="15_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="16_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/file_drop.ogg" id="17_se_stream"]
+[ext_resource type="Script" path="res://src/tools/se_emitter.gd" id="18_se_emitter"]
+[ext_resource type="AudioStreamOggVorbis" path="res://assets/audio/se/neon_buzz.ogg" id="19_se_stream"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -58,3 +66,27 @@ stream = ExtResource("11_se_stream")
 target_path = NodePath("..")
 signal_name = &"clue_found"
 bus = &"SE"
+
+[node name="SeUiWindowOpen" type="AudioStreamPlayer" parent="."]
+script = ExtResource("12_se_emitter")
+stream = ExtResource("13_se_stream")
+target_path = NodePath("..")
+signal_name = &"window_opened"
+
+[node name="SeUiWindowClose" type="AudioStreamPlayer" parent="."]
+script = ExtResource("14_se_emitter")
+stream = ExtResource("15_se_stream")
+target_path = NodePath("..")
+signal_name = &"window_closed"
+
+[node name="SeUiFileDrop" type="AudioStreamPlayer" parent="."]
+script = ExtResource("16_se_emitter")
+stream = ExtResource("17_se_stream")
+target_path = NodePath("..")
+signal_name = &"file_dropped"
+
+[node name="SeUiNeonBuzz" type="AudioStreamPlayer" parent="."]
+script = ExtResource("18_se_emitter")
+stream = ExtResource("19_se_stream")
+target_path = NodePath("..")
+signal_name = &"neon_buzz"

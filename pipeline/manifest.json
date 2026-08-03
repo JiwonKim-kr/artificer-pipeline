@@ -185,6 +185,98 @@
           "action": "generated"
         }
       ]
+    },
+    {
+      "id": "se:ui/window_open",
+      "track": "se",
+      "status": "generated",
+      "spec": "OS 창 열림 → 상승 블립. jsfxr 절차생성(pipeline/se_specs/window_open.json).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::window_opened"
+        }
+      ],
+      "file": "assets/audio/se/window_open.ogg",
+      "history": [
+        {
+          "at": "2026-08-03T03:24:58.836397+00:00",
+          "action": "generated"
+        },
+        {
+          "at": "2026-08-03T03:25:22.751644+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "se:ui/window_close",
+      "track": "se",
+      "status": "generated",
+      "spec": "OS 창 닫힘/내림 → 하강 블립. jsfxr 절차생성(pipeline/se_specs/window_close.json).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::window_closed"
+        }
+      ],
+      "file": "assets/audio/se/window_close.ogg",
+      "history": [
+        {
+          "at": "2026-08-03T03:24:59.021217+00:00",
+          "action": "generated"
+        },
+        {
+          "at": "2026-08-03T03:25:23.098408+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "se:ui/file_drop",
+      "track": "se",
+      "status": "generated",
+      "spec": "정보 파일을 원고에 실음 → 종이 탁(노이즈 임팩트). jsfxr 절차생성(pipeline/se_specs/file_drop.json).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::file_dropped"
+        }
+      ],
+      "file": "assets/audio/se/file_drop.ogg",
+      "history": [
+        {
+          "at": "2026-08-03T03:24:59.207616+00:00",
+          "action": "generated"
+        },
+        {
+          "at": "2026-08-03T03:25:23.458411+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "se:ui/neon_buzz",
+      "track": "se",
+      "status": "generated",
+      "spec": "타이틀 네온 점멸 버스트 → 지직(고역 노이즈). jsfxr 절차생성(pipeline/se_specs/neon_buzz.json).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::neon_buzz"
+        }
+      ],
+      "file": "assets/audio/se/neon_buzz.ogg",
+      "history": [
+        {
+          "at": "2026-08-03T03:24:59.388822+00:00",
+          "action": "generated"
+        },
+        {
+          "at": "2026-08-03T03:25:23.826171+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }

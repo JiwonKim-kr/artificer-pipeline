@@ -75,6 +75,10 @@ signal article_published     # 발행 → 타자기 카춘크
 signal distortion_detected   # 이번 턴 신규 발각 → 스팅어
 signal ending_reached        # 엔딩 도달
 signal clue_found            # 책상에서 형 테오 흔적 발견
+signal window_opened         # OS 창 열림 → 팝
+signal window_closed         # OS 창 닫힘/내림 → 역팝
+signal file_dropped          # 정보 파일을 원고에 실음 → 종이 탁
+signal neon_buzz             # 타이틀 네온 지직(점멸 버스트 시작)
 
 var _tm: TurnManager
 var _desk: Control
@@ -114,6 +118,8 @@ var _fade_rect: ColorRect           # 데스크↔스크린 트랜지션용 암�
 var _transitioning: bool = false    # 트랜지션 중 입력 무시(중복 클릭·ESC 연타 방지)
 var _crt_mat: ShaderMaterial        # CRT 셰이더(파워온 연출에서 파라미터 트윈)
 var _needle_rot_base: float = 0.0   # 바늘 목표 회전(트윈 대상). 실제 회전 = base + 떨림
+var _needle_excite: float = 0.0     # 발행 직후 동요(떨림 증폭, 시간 감쇠)
+var _tube_dims: Array = []          # 닉시관 소등 오버레이 5개 — 켜진 개수 = 여론 레벨
 var _title_view: Control            # 타이틀 화면(시작 전)
 var _day_card: Control              # 턴 경과(석간 마감→다음 날) 인터스티셜
 var _day_label: Label
@@ -127,6 +133,7 @@ var _taskbar_day: Label             # 태스크바 우측 "제 N 일" 표시
 var _day_stage: int = 0             # 턴 경과 카드 진행 단계(클릭으로 넘김)
 var _day_done: Callable             # 카드 종료 후 콜백
 var _day_busy: bool = false         # 페이드 중 클릭 무시
+var _booted: bool = false           # _ready 완료 후 true — 부팅 중 창 SE 발화 방지
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -146,6 +153,7 @@ func _ready() -> void:
 	_fade_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fade_rect)
+	_booted = true
 
 # ---------- 타이틀 화면 (네온사인 컨셉) ----------
 func _build_title() -> void:
@@ -229,6 +237,7 @@ func _neon_flicker_loop() -> void:
 		return
 	var tw := create_tween()
 	tw.tween_interval(_neon_rng.randf_range(0.9, 2.4))
+	tw.tween_callback(neon_buzz.emit)  # 버스트 시작에 지직음
 	for i in _neon_rng.randi_range(2, 4):
 		tw.tween_callback(_set_neon.bind(false))
 		tw.tween_interval(_neon_rng.randf_range(0.03, 0.09))
@@ -888,6 +897,8 @@ func _open_win(key: String) -> void:
 	var tw := create_tween()
 	tw.tween_property(w, "scale", Vector2.ONE, 0.16) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if _booted:
+		window_opened.emit()
 	if key == "mail":
 		_mail_unread = 0
 		_update_mail_badge()
@@ -898,6 +909,8 @@ func _open_win(key: String) -> void:
 func _close_window(panel: PanelContainer, minimized: bool = false) -> void:
 	panel.visible = false
 	panel.set_meta("minimized", minimized)
+	if _booted:
+		window_closed.emit()
 	_update_taskbar_state()
 
 ## 태스크바 상태 표기: ● 열림(밝음) / ◌ 내려짐(중간) / 표시 없음 닫힘(어둡게).
@@ -1286,6 +1299,7 @@ func _add_to_draft(id: String) -> void:
 	if id == "" or _draft_ids.has(id) or _block_by_id(id).is_empty():
 		return
 	_draft_ids.append(id)
+	file_dropped.emit()
 	_refresh_draft()
 	_refresh_blocks()  # 폴더 쪽에 '원고에 실림' 표시 갱신
 
@@ -1407,6 +1421,7 @@ func _make_gauge_widget(pos: Vector2) -> PanelContainer:
 	dial.custom_minimum_size = Vector2(0, 200)
 	dial.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	dial.clip_contents = true
+	dial.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 클릭이 패널(드래그 핸들러)로 가게
 	panel.add_child(dial)
 	var tex := _res(GAUGE_TEX)
 	if tex != null:
@@ -1423,7 +1438,16 @@ func _make_gauge_widget(pos: Vector2) -> PanelContainer:
 	_needle.width = 3.0
 	_needle.default_color = Color(1.0, 0.5, 0.2)
 	dial.add_child(_needle)
-	# 바늘을 텍스처의 다이얼 축(중앙 상단쪽 점)에 맞춘다. 창 크기가 바뀌어도 따라가도록
+	# 닉시관 소등 오버레이: 아트의 5개 관 위에 어두운 막을 얹어 '꺼짐'을 표현한다.
+	# 켜진 관 수 = 거시 여론 레벨(부정확 계기라 숫자 대신 관 개수로 읽는다).
+	_tube_dims.clear()
+	for i in 5:
+		var dim := ColorRect.new()
+		dim.color = Color(0.02, 0.015, 0.01, 0.62)
+		dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dial.add_child(dim)
+		_tube_dims.append(dim)
+	# 바늘·관 오버레이를 텍스처 실좌표에 맞춘다. 창 크기가 바뀌어도 따라가도록
 	# resized 에 연결한다. 하드코딩 좌표를 쓰면 창 치수를 조금만 건드려도 어긋난다.
 	dial.resized.connect(func() -> void: _fit_needle(dial))
 	_fit_needle(dial)
@@ -1440,23 +1464,38 @@ func _fit_needle(dial: Control) -> void:
 	var oy: float = (dial.size.y - s) * 0.5
 	_needle.position = Vector2(ox + s * 0.50, oy + s * 0.35)
 	_needle.points = PackedVector2Array([Vector2.ZERO, Vector2(0, -s * 0.20)])
+	# 닉시관 5개 위치(512² 아트 실측: 관 행 y≈0.64~0.93, 관 폭≈0.15 간격≈0.165)
+	for i in _tube_dims.size():
+		var dim := _tube_dims[i] as ColorRect
+		dim.position = Vector2(ox + s * (0.10 + 0.163 * i), oy + s * 0.645)
+		dim.size = Vector2(s * 0.135, s * 0.27)
 
 ## 바늘은 즉시 꺾이지 않는다 — 목표각까지 무겁게 스윙 후 살짝 오버슈트(아날로그 계기).
 ## 실제 회전은 _process 에서 base + 상시 미세 떨림으로 합성한다(세계관: 부정확한 바늘).
+## 갱신 직후엔 동요(_needle_excite)로 떨림이 커졌다가 가라앉고, 닉시관 점등 수도 갱신된다.
 func _set_needle(macro: float) -> void:
 	if _needle == null:
 		return
 	var target: float = deg_to_rad((macro - 0.5) * 120.0)  # 0.5=수직, 우=찬성, 좌=반대
+	_needle_excite = 1.0  # 새 여론 반영 = 계기가 크게 흔들린다
 	var tw := create_tween()
 	tw.tween_property(self, "_needle_rot_base", target, 1.4) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# 닉시관: macro(0~1) × 5 개. 경계 관은 반쯤 밝아져 미세 변화도 보인다.
+	for i in _tube_dims.size():
+		var lit: float = clampf(macro * 5.0 - float(i), 0.0, 1.0)
+		var dtw := create_tween()
+		dtw.tween_property(_tube_dims[i], "color:a", lerpf(0.62, 0.0, lit), 0.9) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _needle == null or _screen == null or not _screen.visible:
 		return
-	# 두 사인파 합성으로 불규칙해 보이는 미세 진동(±0.9°). 난수 대신 사인이라 결정론적·저비용.
+	_needle_excite = maxf(0.0, _needle_excite - delta * 0.35)  # 약 3초에 걸쳐 진정
+	# 두 사인파 합성으로 불규칙해 보이는 미세 진동(±0.9°, 동요 시 최대 ±3.5°).
 	var t: float = Time.get_ticks_msec() / 1000.0
-	var jitter: float = deg_to_rad(0.55) * sin(t * 7.3) + deg_to_rad(0.35) * sin(t * 13.7)
+	var amp: float = 1.0 + 3.0 * _needle_excite
+	var jitter: float = (deg_to_rad(0.55) * sin(t * 7.3) + deg_to_rad(0.35) * sin(t * 13.7)) * amp
 	_needle.rotation = _needle_rot_base + jitter
 
 # ---------- 발행 ----------
@@ -1578,12 +1617,24 @@ func _build_article_panel(parent: Control) -> void:
 	parent.add_child(panel)
 	_article_panel = panel
 
+## 오버레이 높이를 기사 분량에 맞춘다(짧은 기사가 빈 판때기 위에 뜨지 않게).
+## 오토랩 라벨의 실높이는 레이아웃 패스 후에 확정되므로 지연 호출로 잰다.
+func _fit_article_panel() -> void:
+	if _article_panel == null or _article_box == null:
+		return
+	var content_h: float = _article_box.get_combined_minimum_size().y
+	var h: float = clampf(content_h + 92.0, 200.0, 500.0)
+	_article_panel.custom_minimum_size = Vector2(620, h)
+	_article_panel.size = Vector2(620, h)
+	_article_panel.pivot_offset = _article_panel.size * 0.5
+
 ## 현재 인덱스의 기사를 다시 그리고 < > · 카운터 상태를 갱신한다.
 func _refresh_article_view() -> void:
 	if _article_idx < 0 or _article_idx >= _article_history.size():
 		return
 	var e: Dictionary = _article_history[_article_idx]
 	_render_article(e["reported"], str(e["frame"]), e["body"])
+	call_deferred("_fit_article_panel")
 	if _article_nav_label != null:
 		_article_nav_label.text = "T%d · %d/%d" % [int(e["turn"]), _article_idx + 1, _article_history.size()]
 	if _article_prev_btn != null:
@@ -1650,7 +1701,8 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_article_box.add_child(head)
 	_article_box.add_child(HSeparator.new())
-	# 본문: 리드 사실의 프레임별 prose 문단 + 보조 사실 한 줄(최대 3). prose 없으면 블록 나열 폴백.
+	# 본문: 리드 사실 prose + 보조 사실도 문단 전체(최대 2건) + 나머지는 단신 한 줄.
+	# 문단 수가 늘어 '전문'답게 읽힌다. prose 없으면 블록 나열 폴백.
 	var lbodies: Dictionary = lf.get("bodies", {})
 	if lbodies.has(frame_label):
 		var lead := Label.new()
@@ -1658,20 +1710,28 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 		lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lead.add_theme_color_override("font_color", Color(0.88, 0.9, 0.82))
 		_article_box.add_child(lead)
-		var support := 0
+		var full_paras := 0
+		var briefs := 0
 		for fid in reported:
-			if support >= 3:
-				break
 			if str(fid) == lead_fid:
 				continue
 			var fb: Dictionary = (facts.get(fid, {}) as Dictionary).get("bodies", {})
-			if fb.has(frame_label):
+			if not fb.has(frame_label):
+				continue
+			if full_paras < 2:
+				var sp := Label.new()
+				sp.text = str(fb[frame_label])
+				sp.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				sp.add_theme_color_override("font_color", Color(0.8, 0.83, 0.76))
+				_article_box.add_child(sp)
+				full_paras += 1
+			elif briefs < 2:
 				var sl := Label.new()
-				sl.text = "— " + _first_sentence(str(fb[frame_label]))
+				sl.text = "— 한편, " + _first_sentence(str(fb[frame_label]))
 				sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-				sl.add_theme_color_override("font_color", Color(0.72, 0.76, 0.7))
+				sl.add_theme_color_override("font_color", Color(0.68, 0.72, 0.66))
 				_article_box.add_child(sl)
-				support += 1
+				briefs += 1
 	else:
 		var shown: int = mini(body_lines.size(), 6)
 		for i in shown:
