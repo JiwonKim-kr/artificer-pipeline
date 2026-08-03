@@ -6,6 +6,8 @@ extends Control
 
 const DESK_BG := "res://assets/art/ui/main/desk_bg.png"
 const GAUGE_TEX := "res://assets/art/ui/gauge/opinion_needle.png"
+# 브라스 프레임 아트(frame.png)는 슬림 크롬 전환으로 창에서는 미사용.
+# 매니페스트 art:ui/window/frame 은 유지 — 향후 타이틀 사인/엔딩 액자 재활용 후보.
 const WINDOW_FRAME := "res://assets/art/ui/window/frame.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
 # 책상 뒤지기 클로즈업(선택 에셋): 이미지가 들어오면 자동 사용, 없으면 텍스트 연출만.
@@ -962,44 +964,96 @@ func _push_mail(sender: String, subject: String, body: String) -> void:
 		_mail_unread += 1
 		_update_mail_badge()
 
-func _window(pos: Vector2, size: Vector2, title: String, extra_top: float = 0.0) -> PanelContainer:
+## Win98 풍 슬림 창 크롬 × 디젤펑크 팔레트. 두꺼운 브라스 9-slice(내용 여백 46~70px)가
+## 정보 면적을 다 먹던 문제를 해소: 얇은 베벨(2px) + 타이틀바(제목 + 실제 ▁/✕ 버튼).
+## extra_top 은 구 프레임 시절 호환 인자(무시).
+func _window(pos: Vector2, size: Vector2, title: String, _extra_top: float = 0.0) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.position = pos
 	panel.custom_minimum_size = size
 	panel.size = size
-	# 내용이 창 프레임 밖으로 새지 않게 자른다. 넘치는 내용은 각 창이 ScrollContainer 로
-	# 처리한다(잘라서 감추는 게 아니라 스크롤로 접근 가능하게).
 	panel.clip_contents = true
-	# 창 크롬: 브라스 프레임 텍스처를 9-slice(StyleBoxTexture)로 늘린다.
-	# 텍스처 512² 중 테두리 약 96px 이 장식부라 그만큼 마진으로 잡아 모서리를 보존한다.
-	var frame_tex := _res(WINDOW_FRAME)
-	if frame_tex is Texture2D:
-		var sb := StyleBoxTexture.new()
-		sb.texture = frame_tex
-		# 9-slice 마진: 창이 340px 대인데 96(텍스처 장식 실폭)을 쓰면 모서리만으로
-		# 폭을 다 먹어 본문이 넘친다. 44 로 줄여 테두리 질감만 살린다.
-		sb.set_texture_margin_all(44.0)
-		# 본문 여백을 프레임 실측 브라스 두께에 맞춘다(512² 텍스처 기준: 상단 타이틀바
-		# ~64px 로 가장 두껍고, 하단·좌우는 ~52px). 이보다 작으면 글자가 장식 위로 올라탄다.
-		sb.content_margin_left = 46.0
-		sb.content_margin_right = 46.0
-		# 상단 70: 9-slice 특성상 창이 높을수록(원고 556px) 상단 브라스가 더 늘어나
-		# 두꺼워져서, 가장 높은 창 기준으로 잡는다(짧은 창은 여유만 더 생김).
-		sb.content_margin_top = 70.0 + extra_top  # 높은 창(원고)은 상단 브라스가 더 두꺼워 추가 여백
-		sb.content_margin_bottom = 48.0
-		panel.add_theme_stylebox_override("panel", sb)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.11, 0.095, 0.075)      # 바켈라이트 면
+	sb.border_color = Color(0.58, 0.45, 0.24)    # 브라스 베벨
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(2)
+	sb.set_content_margin_all(4)
+	sb.shadow_color = Color(0, 0, 0, 0.5)
+	sb.shadow_size = 6
+	panel.add_theme_stylebox_override("panel", sb)
 	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 4)
 	panel.add_child(vb)
+	# 타이틀바: Win98 처럼 좌측 제목 + 우측 내리기/닫기. 바 배경 클릭은 패널로 통과(드래그).
+	var bar := PanelContainer.new()
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bsb := StyleBoxFlat.new()
+	bsb.bg_color = Color(0.32, 0.22, 0.10)       # 어두운 브라스 타이틀바
+	bsb.border_color = Color(0.62, 0.48, 0.26)
+	bsb.border_width_bottom = 1
+	bsb.set_corner_radius_all(1)
+	bsb.content_margin_left = 8.0
+	bsb.content_margin_right = 3.0
+	bsb.content_margin_top = 2.0
+	bsb.content_margin_bottom = 2.0
+	bar.add_theme_stylebox_override("panel", bsb)
+	vb.add_child(bar)
+	var bar_row := HBoxContainer.new()
+	bar_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_row.add_theme_constant_override("separation", 3)
+	bar.add_child(bar_row)
 	var t := Label.new()
 	t.text = "▍ " + title
 	t.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
-	vb.add_child(t)
-	vb.add_child(HSeparator.new())
-	panel.set_meta("body", vb)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_row.add_child(t)
+	var min_b := _chrome_button("▁")
+	min_b.tooltip_text = "내리기"
+	min_b.pressed.connect(func() -> void: _close_window(panel, true))
+	bar_row.add_child(min_b)
+	var x_b := _chrome_button("✕")
+	x_b.tooltip_text = "닫기"
+	x_b.pressed.connect(func() -> void: _close_window(panel, false))
+	bar_row.add_child(x_b)
+	# 본문: 얇은 여백만 두고 내용에 면적을 최대로 준다.
+	var body_wrap := MarginContainer.new()
+	body_wrap.add_theme_constant_override("margin_left", 6)
+	body_wrap.add_theme_constant_override("margin_right", 6)
+	body_wrap.add_theme_constant_override("margin_top", 2)
+	body_wrap.add_theme_constant_override("margin_bottom", 6)
+	body_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vb.add_child(body_wrap)
+	var body := VBoxContainer.new()
+	body_wrap.add_child(body)
+	panel.set_meta("body", body)
 	panel.set_meta("title_label", t)  # 타이틀 갱신용(예: 정보원 오늘/누적 카운트)
-	# OS 창답게: 클릭하면 앞으로, 타이틀바(상단 브라스)를 잡으면 드래그.
+	# OS 창답게: 클릭하면 앞으로, 타이틀바를 잡으면 드래그.
 	panel.gui_input.connect(_window_gui_input.bind(panel))
 	return panel
+
+## 타이틀바용 소형 브라스 버튼(Win98 의 _ X 에 해당).
+func _chrome_button(txt: String) -> Button:
+	var b := Button.new()
+	b.text = txt
+	b.custom_minimum_size = Vector2(26, 20)
+	b.focus_mode = Control.FOCUS_NONE
+	var base := StyleBoxFlat.new()
+	base.bg_color = Color(0.55, 0.44, 0.26)
+	base.border_color = Color(0.82, 0.68, 0.42)
+	base.set_border_width_all(1)
+	base.set_corner_radius_all(1)
+	var hover := base.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.68, 0.54, 0.32)
+	var pressed := base.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.38, 0.30, 0.18)
+	b.add_theme_stylebox_override("normal", base)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", pressed)
+	b.add_theme_color_override("font_color", Color(0.10, 0.08, 0.05))
+	b.add_theme_font_size_override("font_size", 12)
+	return b
 
 func _window_gui_input(ev: InputEvent, panel: PanelContainer) -> void:
 	if ev is InputEventMouseButton:
@@ -1007,15 +1061,8 @@ func _window_gui_input(ev: InputEvent, panel: PanelContainer) -> void:
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
 				panel.move_to_front()
-				# 프레임 아트에 그려진 창 버튼을 실제로 동작시킨다:
-				# 우상단(□·X) = 닫기 / 좌상단(—) = 내리기 — 태스크바 표기가 달라진다(●/◌/닫힘).
-				if mb.position.y <= 46.0 and mb.position.x >= panel.size.x - 88.0:
-					_close_window(panel, false)
-					return
-				if mb.position.y <= 46.0 and mb.position.x <= 88.0:
-					_close_window(panel, true)
-					return
-				if mb.position.y <= 64.0:  # 타이틀바(상단 브라스 두께) 영역만 드래그 시작
+				# 내리기/닫기는 타이틀바의 실제 ▁/✕ 버튼이 처리한다(버튼이 클릭을 소비).
+				if mb.position.y <= 28.0:  # 타이틀바 영역만 드래그 시작
 					panel.set_meta("dragging", true)
 			else:
 				panel.set_meta("dragging", false)
