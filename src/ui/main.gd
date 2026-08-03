@@ -13,6 +13,11 @@ const DESK_SEARCH_TEX := "res://assets/art/ui/main/desk_search_closeup.png"
 # 데스크 배경에서 모니터 화면의 중심(뷰포트 비율). 줌 인 트랜지션의 초점.
 # 현 desk_bg.png 실측: 브라운관 유리면 중심 ≈ (0.51, 0.35).
 const MONITOR_FOCUS := Vector2(0.51, 0.35)
+
+# 게임 제목(가제) — 확정 시 이 두 상수만 바꾸면 타이틀 화면에 반영된다.
+# 신문 제호(마스트헤드) 컨셉: 플레이어=치차 석간 기자이므로 제호가 곧 타이틀.
+const TITLE_TEXT := "치차 석간"
+const TITLE_SUB := "— 태엽 인간 사건 —"
 const SETTINGS_PATH := "user://settings.cfg"  # 사운드 볼륨 등 사용자 설정 저장
 
 ## 댓글 작성자 핸들 풀 — 세그먼트 페르소나(설계 §4·§5)에 맞춘 디젤펑크 톤.
@@ -102,6 +107,13 @@ var _fade_rect: ColorRect           # 데스크↔스크린 트랜지션용 암�
 var _transitioning: bool = false    # 트랜지션 중 입력 무시(중복 클릭·ESC 연타 방지)
 var _crt_mat: ShaderMaterial        # CRT 셰이더(파워온 연출에서 파라미터 트윈)
 var _needle_rot_base: float = 0.0   # 바늘 목표 회전(트윈 대상). 실제 회전 = base + 떨림
+var _title_view: Control            # 타이틀 화면(시작 전)
+var _day_card: Control              # 턴 경과(석간 마감→다음 날) 인터스티셜
+var _day_label: Label
+var _windows: Dictionary = {}       # OS 앱 창: key -> PanelContainer (mail/informant/editor/comments/gauge)
+var _dock_btns: Dictionary = {}     # OS 독 버튼: key -> Button (라벨 갱신·배지용)
+var _mail_list: VBoxContainer       # 수신함 본문(최신이 위)
+var _mail_unread: int = 0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -111,6 +123,9 @@ func _ready() -> void:
 	_build_desk()
 	_build_screen()
 	_screen.visible = false
+	_desk.visible = false
+	_build_title()  # 시작은 타이틀 화면(신문 제호)에서
+	_build_day_card()
 	# 트랜지션 암전막: 항상 최상단(CRT 포함 모든 것 위). 평소엔 투명+클릭 통과.
 	_fade_rect = ColorRect.new()
 	_fade_rect.name = "TransitionFade"
@@ -118,6 +133,83 @@ func _ready() -> void:
 	_fade_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fade_rect)
+
+# ---------- 타이틀 화면 (신문 제호 컨셉) ----------
+func _build_title() -> void:
+	_title_view = Control.new()
+	_title_view.name = "TitleView"
+	_title_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_title_view)
+	var bg := ColorRect.new()
+	bg.color = Color(0.10, 0.085, 0.06)  # 오래된 갱지 톤의 어두운 배경
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_title_view.add_child(bg)
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	box.add_theme_constant_override("separation", 10)
+	_title_view.add_child(box)
+	# 제호 위아래의 이중 괘선(굵은 선+가는 선)으로 신문 마스트헤드 느낌을 만든다.
+	box.add_child(_masthead_rule())
+	var date_line := Label.new()
+	date_line.text = "아이젠 공화국 · 치차  |  노동 근대화법 표결 8일 전"
+	date_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	date_line.add_theme_color_override("font_color", Color(0.62, 0.58, 0.48))
+	box.add_child(date_line)
+	var title := Label.new()
+	title.text = TITLE_TEXT
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 72)
+	title.add_theme_color_override("font_color", Color(0.93, 0.85, 0.68))
+	box.add_child(title)
+	var sub := Label.new()
+	sub.text = TITLE_SUB
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_font_size_override("font_size", 22)
+	sub.add_theme_color_override("font_color", Color(0.78, 0.66, 0.44))
+	box.add_child(sub)
+	box.add_child(_masthead_rule())
+	var pad := Control.new()
+	pad.custom_minimum_size = Vector2(0, 18)
+	box.add_child(pad)
+	var start := _desk_button("출근한다", 52)
+	start.name = "StartButton"
+	start.pressed.connect(_start_game)
+	var wrap := CenterContainer.new()
+	wrap.add_child(start)
+	box.add_child(wrap)
+	var hint := Label.new()
+	hint.text = "무엇을 싣고, 무엇을 뺄 것인가."
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", Color(0.5, 0.47, 0.4))
+	box.add_child(hint)
+	# 제호가 스르륵 떠오르는 인트로.
+	box.modulate = Color(1, 1, 1, 0)
+	var tw := create_tween()
+	tw.tween_property(box, "modulate:a", 1.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func _masthead_rule() -> Control:
+	var rule := VBoxContainer.new()
+	rule.add_theme_constant_override("separation", 3)
+	for h in [3, 1]:
+		var line := ColorRect.new()
+		line.color = Color(0.62, 0.52, 0.34)
+		line.custom_minimum_size = Vector2(560, h)
+		rule.add_child(line)
+	return rule
+
+func _start_game() -> void:
+	if _transitioning:
+		return
+	_transitioning = true
+	var tw := create_tween()
+	tw.tween_property(_fade_rect, "color:a", 1.0, 0.4)
+	tw.tween_callback(func() -> void:
+		_title_view.visible = false
+		_desk.visible = true)
+	tw.tween_property(_fade_rect, "color:a", 0.0, 0.5)
+	tw.tween_callback(func() -> void: _transitioning = false)
 
 func _res(path: String) -> Resource:
 	return load(path) if ResourceLoader.exists(path) else null
@@ -236,6 +328,46 @@ func _crt_power_on() -> void:
 		_transitioning = false
 		_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE)
 
+# ---------- 턴 경과 인터스티셜 ----------
+func _build_day_card() -> void:
+	_day_card = Control.new()
+	_day_card.name = "DayCard"
+	_day_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_day_card.visible = false
+	_day_card.mouse_filter = Control.MOUSE_FILTER_STOP  # 연출 중 클릭 차단
+	var bg := ColorRect.new()
+	bg.color = Color(0, 0, 0, 0.94)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_day_card.add_child(bg)
+	_day_label = Label.new()
+	_day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_day_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_day_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_day_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_day_label.add_theme_font_size_override("font_size", 30)
+	_day_label.add_theme_color_override("font_color", Color(0.9, 0.82, 0.62))
+	_day_card.add_child(_day_label)
+	add_child(_day_card)
+
+## 발행 직후: "석간 마감 → 다음 날" 하루 경과를 한 장으로 보여준 뒤 done 을 호출한다.
+## 엔딩 턴에는 쓰지 않는다(엔딩 오버레이가 우선).
+func _show_day_transition(done: Callable) -> void:
+	_day_label.text = "— 석간 마감. 윤전기가 돈다 —"
+	_day_card.modulate = Color(1, 1, 1, 0)
+	_day_card.visible = true
+	_day_card.move_to_front()
+	var tw := create_tween()
+	tw.tween_property(_day_card, "modulate:a", 1.0, 0.35)
+	tw.tween_interval(0.75)
+	tw.tween_callback(func() -> void:
+		_day_label.text = "제 %d 일 아침  ·  표결까지 %d일" % [
+			_tm.model.turn + 1, maxi(_tm.max_turns - _tm.model.turn, 0)])
+	tw.tween_interval(0.95)
+	tw.tween_property(_day_card, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(func() -> void:
+		_day_card.visible = false
+		done.call())
+
 ## 스크린 → 데스크: 짧은 암전 후 "모니터에서 물러나는" 줌 아웃.
 func _exit_screen() -> void:
 	if _transitioning or (_desk != null and _desk.visible):
@@ -258,7 +390,7 @@ func _exit_screen() -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_ESCAPE:
-		if _transitioning:
+		if _transitioning or (_title_view != null and _title_view.visible):
 			return
 		# ESC 는 열려 있는 오버레이부터 닫는다(기사 → 받은자료 → 설정 → 화면 전환).
 		if _article_panel != null and _article_panel.visible:
@@ -511,10 +643,16 @@ func _build_screen() -> void:
 	_os = os
 	# 배치는 디자인 해상도 1152x648 기준. 프레임(9-slice)의 content margin 이
 	# 상 54·하 28·좌우 30 이므로 창을 그만큼 여유 있게 잡는다.
-	os.add_child(_make_informant(Vector2(20, 46), Vector2(340, 292)))
-	os.add_child(_make_editor(Vector2(376, 46), Vector2(432, 556)))
-	os.add_child(_make_comments(Vector2(824, 46), Vector2(308, 400)))
-	os.add_child(_make_gauge(Vector2(20, 350), Vector2(340, 252)))
+	# OS 바탕화면: 창들은 앱이다 — 기본은 닫혀 있고 상단 독(dock) 아이콘으로 연다.
+	_windows["informant"] = _make_informant(Vector2(20, 46), Vector2(340, 292))
+	_windows["editor"] = _make_editor(Vector2(376, 46), Vector2(432, 556))
+	_windows["comments"] = _make_comments(Vector2(824, 46), Vector2(308, 400))
+	_windows["gauge"] = _make_gauge(Vector2(20, 350), Vector2(340, 252))
+	_windows["mail"] = _make_mail(Vector2(300, 110), Vector2(500, 400))
+	for key in _windows:
+		var w := _windows[key] as PanelContainer
+		os.add_child(w)
+		w.visible = false
 	var back := Button.new()
 	back.name = "BackButton"
 	back.text = "← 데스크 (Esc)"
@@ -522,6 +660,7 @@ func _build_screen() -> void:
 	back.custom_minimum_size = Vector2(150, 30)
 	back.pressed.connect(_exit_screen)
 	os.add_child(back)
+	_build_dock(os)
 	var settings_btn := Button.new()
 	settings_btn.name = "SettingsButton"
 	settings_btn.text = "소리 설정"
@@ -529,6 +668,11 @@ func _build_screen() -> void:
 	settings_btn.custom_minimum_size = Vector2(130, 30)
 	settings_btn.pressed.connect(_toggle_settings)
 	os.add_child(settings_btn)
+	# 첫 부팅: 의뢰 메일이 도착해 있고, 수신함이 열린 채 시작한다(온보딩).
+	_push_mail("산업위원회 (발신전용)", "의뢰 — 표결일까지",
+		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐社도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n※ 독의 [정보원]에서 오늘 입수한 사실을 확인하고 [원고]에서 기사를 발행할 것." % [
+			_tm.max_turns, int(round(float(_tm.model.config["mission"]["winThreshold"]) * 100.0))])
+	_open_win("mail")
 	_build_settings_panel(os)
 	_build_archive_panel(os)
 	_build_article_panel(os)
@@ -548,6 +692,86 @@ func _build_screen() -> void:
 		crt.material = mat
 		_crt_mat = mat  # 파워온 연출에서 스캔라인·색수차 파라미터를 트윈
 	_screen.add_child(crt)
+
+# ---------- OS 독 (앱 런처) ----------
+const DOCK_APPS := [
+	["mail", "메일"], ["informant", "정보원"], ["editor", "원고"], ["comments", "댓글"], ["gauge", "여론계"],
+]
+
+func _build_dock(parent: Control) -> void:
+	var dock := HBoxContainer.new()
+	dock.name = "Dock"
+	dock.position = Vector2(180, 10)
+	dock.add_theme_constant_override("separation", 6)
+	parent.add_child(dock)
+	for app in DOCK_APPS:
+		var key := str(app[0])
+		var b := Button.new()
+		b.text = str(app[1])
+		b.custom_minimum_size = Vector2(88, 30)
+		b.pressed.connect(_toggle_win.bind(key))
+		dock.add_child(b)
+		_dock_btns[key] = b
+
+func _toggle_win(key: String) -> void:
+	var w := _windows.get(key) as PanelContainer
+	if w == null:
+		return
+	if w.visible:
+		w.visible = false
+	else:
+		_open_win(key)
+
+## 창을 열고 앞으로. 팝 인 연출 + 메일이면 읽음 처리(배지 해제).
+func _open_win(key: String) -> void:
+	var w := _windows.get(key) as PanelContainer
+	if w == null:
+		return
+	w.visible = true
+	w.move_to_front()
+	w.pivot_offset = w.size * 0.5
+	w.scale = Vector2(0.95, 0.95)
+	var tw := create_tween()
+	tw.tween_property(w, "scale", Vector2.ONE, 0.16) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if key == "mail":
+		_mail_unread = 0
+		_update_mail_badge()
+
+func _update_mail_badge() -> void:
+	var b := _dock_btns.get("mail") as Button
+	if b != null:
+		b.text = "메일" if _mail_unread <= 0 else "메일(%d)" % _mail_unread
+		b.modulate = Color(1, 1, 1) if _mail_unread <= 0 else Color(1.0, 0.85, 0.6)
+
+# ---------- 메일 앱 (편집장·압박·분기 메시지 수신함) ----------
+func _make_mail(pos: Vector2, size: Vector2) -> PanelContainer:
+	var panel := _window(pos, size, "수신함 — 치차 석간 내부망")
+	_mail_list = _scroll_body(_body_of(panel))
+	return panel
+
+## 수신함 맨 위에 메일을 꽂는다. 수신함이 닫혀 있으면 독에 미읽음 배지.
+func _push_mail(sender: String, subject: String, body: String) -> void:
+	if _mail_list == null:
+		return
+	var row := VBoxContainer.new()
+	var head := Label.new()
+	head.text = "▸ %s  —  %s" % [subject, sender]
+	head.add_theme_color_override("font_color", Color(0.95, 0.8, 0.5))
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(head)
+	var b := Label.new()
+	b.text = body
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.add_theme_color_override("font_color", Color(0.8, 0.82, 0.75))
+	row.add_child(b)
+	row.add_child(HSeparator.new())
+	_mail_list.add_child(row)
+	_mail_list.move_child(row, 0)  # 최신이 위
+	var w := _windows.get("mail") as PanelContainer
+	if w == null or not w.visible:
+		_mail_unread += 1
+		_update_mail_badge()
 
 func _window(pos: Vector2, size: Vector2, title: String, extra_top: float = 0.0) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -584,7 +808,27 @@ func _window(pos: Vector2, size: Vector2, title: String, extra_top: float = 0.0)
 	vb.add_child(HSeparator.new())
 	panel.set_meta("body", vb)
 	panel.set_meta("title_label", t)  # 타이틀 갱신용(예: 정보원 오늘/누적 카운트)
+	# OS 창답게: 클릭하면 앞으로, 타이틀바(상단 브라스)를 잡으면 드래그.
+	panel.gui_input.connect(_window_gui_input.bind(panel))
 	return panel
+
+func _window_gui_input(ev: InputEvent, panel: PanelContainer) -> void:
+	if ev is InputEventMouseButton:
+		var mb := ev as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				panel.move_to_front()
+				if mb.position.y <= 64.0:  # 타이틀바(상단 브라스 두께) 영역만 드래그 시작
+					panel.set_meta("dragging", true)
+			else:
+				panel.set_meta("dragging", false)
+	elif ev is InputEventMouseMotion and bool(panel.get_meta("dragging", false)):
+		var vp := get_viewport_rect().size
+		var p: Vector2 = panel.position + (ev as InputEventMouseMotion).relative
+		# 창이 화면 밖으로 사라지지 않게 타이틀바가 항상 잡히는 범위로 제한.
+		p.x = clampf(p.x, -panel.size.x + 80.0, vp.x - 80.0)
+		p.y = clampf(p.y, 0.0, vp.y - 60.0)
+		panel.position = p
 
 func _body_of(panel: Node) -> VBoxContainer:
 	return panel.get_meta("body") as VBoxContainer
@@ -859,8 +1103,6 @@ func _on_publish() -> void:
 		_article_idx = _article_history.size() - 1  # 새 기사를 현재로
 		_article_view_btn.disabled = false
 		_refresh_article_view()
-		if not bool(result["over"]):
-			_show_article()  # 완성 기사 자동 출력(엔딩 턴은 엔딩 오버레이 우선)
 	var report_txt: String = "미보도" if reported.is_empty() else "보도 %d건" % reported.size()
 	_status_label.text = "%s · 논조 %s(δ=%.2f) · 부동층 %d%%" % [
 		report_txt, str(result["frame_label"]), float(result["distortion"]), int(round(swing * 100.0)),
@@ -869,6 +1111,11 @@ func _on_publish() -> void:
 		_pressure_label.text = str(result["pressure_hint"])
 	if _branch_label != null and str(result["branch_hint"]) != "":
 		_branch_label.text = str(result["branch_hint"])
+	# 압박·분기는 편집장 명의의 메일로도 도착한다(계기 비표시 원칙 — 수치 없이 문구만).
+	if str(result["pressure_hint"]) != "":
+		_push_mail("편집장", "위에서 온 이야기", str(result["pressure_hint"]))
+	if str(result["branch_hint"]) != "":
+		_push_mail("편집장", "참고", str(result["branch_hint"]))
 	if bool(result["f16_unlocked"]) and not _f16_shown:
 		_f16_shown = true
 		_refresh_blocks()  # F16 취재선 열림 → 새 문장 블록 등장
@@ -881,6 +1128,12 @@ func _on_publish() -> void:
 		_refresh_blocks()     # 원고 창 = 새 턴 오늘 블록
 		if _archive_panel != null and _archive_panel.visible:
 			_refresh_archive()
+		# 하루 경과 연출 → 기사 지면 팝 + 여론(댓글) 창 자동 오픈.
+		var had_article: bool = not reported.is_empty()
+		_show_day_transition(func() -> void:
+			if had_article:
+				_show_article()
+			_open_win("comments"))
 
 func _update_turn_label() -> void:
 	if _turn_label != null and _tm != null:
