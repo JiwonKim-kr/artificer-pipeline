@@ -398,6 +398,11 @@ func _enter_screen() -> void:
 	if _transitioning or (_screen != null and _screen.visible):
 		return
 	_transitioning = true
+	# 줌인하는 동안 '불 켜진' 모니터 이미지를 확정(줌으로 핫스팟이 밀려도 원본으로 안 돌아가게).
+	if _desk_bg_rect != null:
+		var lit := _res(DESK_BG_MONITOR) as Texture2D
+		if lit != null:
+			_desk_bg_rect.texture = lit
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP  # 전환 중 클릭 차단
 	_desk.pivot_offset = get_viewport_rect().size * MONITOR_FOCUS
 	var tw := create_tween()
@@ -409,6 +414,8 @@ func _enter_screen() -> void:
 	tw.chain().tween_callback(func() -> void:
 		_desk.visible = false
 		_desk.scale = Vector2.ONE
+		if _desk_bg_rect != null and _desk_bg_default != null:
+			_desk_bg_rect.texture = _desk_bg_default  # 데스크 복귀 대비 원본 복원
 		_screen.visible = true
 		monitor_powered.emit()
 		_crt_power_on())
