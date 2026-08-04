@@ -277,6 +277,25 @@
           "action": "generated"
         }
       ]
+    },
+    {
+      "id": "art:ui/main/desk_bg_monitor",
+      "track": "art",
+      "status": "generated",
+      "spec": "데스크 배경 점등 변형(모니터 hover 시 불 켜짐). Scenario 플랫폼 경유 GPT Image 2 수동 생성(2026-08-04 팀 확인) — 커스텀 스타일 모델 미사용분으로 도구 별도 명시.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::DESK_BG_MONITOR"
+        }
+      ],
+      "file": "assets/art/ui/main/desk_bg_monitor.png",
+      "history": [
+        {
+          "at": "2026-08-04T11:33:45.513128+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }

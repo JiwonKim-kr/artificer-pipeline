@@ -44,7 +44,9 @@ AI가 생성한 게임 로직을 그대로 믿지 않는다. **오라클(정답 
 | **FLUX (범용 이미지 모델, Scenario 플랫폼 경유)** | `art concept` — 스타일 확정 전 컨셉 후보 탐색 | 디젤펑크 컨셉 **13종** 생성 → 사람이 선별 |
 | **Scenario (커스텀 스타일 모델 학습·생성)** | `art lock`(선별 컨셉으로 스타일 모델 학습, 2026-08-01 사람 승인) + `art gen` | 스타일 모델 `taeyeop-dieselpunk` 고정(`docs/style_guide.md`), UI 아트 — 책상 배경(점등 변형 포함)·창 프레임·여론계 게이지 |
 | **lore export** (Claude 생성 + 기계 검증) | 세계관(canon) 정합 게임 텍스트 대량 생성 — 스키마·topic 정본·중복·노출 불가 조합을 스크립트(`pipeline/scripts/lore_export.py`)가 차단 | 댓글 뱅크 **87→132건** 확장(세그먼트×반응 셀 전부 11건+, topic 10종 균형) |
-| **Gemini** (Google) | 초기 데스크 배경 시안 등 이미지 시안·변형 생성 | 시안 및 배경 점등 변형 `[팀 확인: desk_bg_monitor.png·모니터 hover 이미지의 생성 도구를 확정해 기재할 것]` |
+| **GPT Image 2** (Scenario 플랫폼 경유, 수동 생성) | 데스크 배경의 점등 변형 — 모니터 hover 시 불 켜진 배경 | `desk_bg_monitor.png` 1종 |
+
+※ 탐색 후 폐기한 도구: **Gemini**(Google) — 초기 데스크 배경 시안에 시험했으나 퀄리티 문제로 폐기, **최종 산출물에 미사용**.
 
 ## 5. AI 대상 주요 프롬프트 · 지시 사항
 
@@ -85,7 +87,7 @@ AI가 생성한 게임 로직을 그대로 믿지 않는다. **오라클(정답 
 | wasm-media-encoders 0.7.0 | npm | MIT | (개발 도구) WAV 인코딩 |
 | ffmpeg | ffmpeg.org (gyan.dev 빌드) | GPL/LGPL | (개발 도구) 라우드니스 정규화 — 산출 OGG만 게임에 포함, ffmpeg 자체는 미배포 |
 | certifi / Pillow (Python) | PyPI | MPL-2.0 / MIT-CMU | (개발 도구) 파이프라인 스크립트 |
-| **아트 에셋 전부** (배경·창 프레임·게이지 등) | **자체 생성** — FLUX 컨셉 + Scenario 커스텀 스타일 모델(생성 도구 §4 명시). `[팀 확인: desk_bg_monitor.png 등 후반 추가 이미지의 생성 도구 확정 — 유의사항상 도구 누락 금지]` | 자체 보유 | 게임 UI 아트 |
+| **아트 에셋 전부** (배경·창 프레임·게이지·배경 점등 변형) | **자체 생성** — FLUX 컨셉 + Scenario 커스텀 스타일 모델 + GPT Image 2(Scenario 경유, 점등 변형 1종). 생성 도구 §4 명시 | 자체 보유 | 게임 UI 아트 |
 | **효과음 .ogg 9종** | **자체 생성** — jsfxr(재현 spec `pipeline/se_specs/` 커밋) | 자체 보유 | UI/이벤트 SE |
 | **게임 텍스트 전부** (사실·기사·댓글·canon) | **자체 작성/생성** (사람+Claude, §4·§5) | 자체 보유 | 콘텐츠 |
 
