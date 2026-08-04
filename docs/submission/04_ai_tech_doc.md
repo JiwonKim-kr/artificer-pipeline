@@ -1,50 +1,110 @@
-# AI 활용 기술 문서 — 구조 (승부처 · 유의사항 준수 필수)
+# AI 활용 기술 문서 — 태엽 인간 (TeamNuN)
 
-> 목적: "AI를 **어디에·어떻게·왜** 썼는가"로 판단력 입증. **핵심 = AI를 안 쓴 곳.**
-> ⚠️ **유의사항(위배 시 선발 취소)**: ① **사용 AI 도구 + 활용 내역**을 반드시 기재(§4·§5) ② **외부 에셋/오픈소스 출처·라이선스**를 이 문서에 반드시 명시(§7).
-> 고정 메시지 3개: ① 2계층으로 AI 산출을 오라클과 대조 ② 승인 지점으로 결정권은 사람 ③ AI를 안 쓴 지점이 신뢰성·재현성을 만든다.
+> **한 줄 요약**: 이 게임은 "AI가 만든 게임"이다 — 사람은 디렉션·설계 결정·감각 판단·최종 검수만 하고,
+> 코드·아트·사운드·게임 텍스트 생성과 그 **검증**까지를 명령(prompt) 기반 AI 파이프라인이 수행했다.
+> 그리고 그 신뢰성은 역설적으로 **AI를 의도적으로 쓰지 않은 지점**(결정론 여론 엔진·절차 사운드·몬테카를로 밸런싱)이 보증한다.
 
 ---
 
 ## 1. 개요 / 문제의식
-> [채움] 사람만 할 판단(디렉션·설계·감각·검수) 빼고 나머지를 **명령(prompt)만으로** 처리하는 AI 오케스트레이션 파이프라인 + 그것으로 게임 제작. [출처] `HANDOFF.md` §1·§2
 
-## 2. 2계층 아키텍처 (신뢰의 핵심)
-> [채움] 검증 계층 `sim/opinion-model/`(오라클, 웹빌드 제외) ↔ 런타임 `src/core`·`src/ui`, config 단일 출처, `opinion_parity_test` 비트-정확 대조. [출처] `docs/build/gireki_dev_guide.md` §2, `sim/opinion-model/`, `pipeline/tests/opinion_parity_test.gd`
+게임 개발에서 사람이 직접 해야만 하는 일(아이디어·디렉션, 로직의 설계 결정, 재미·감각 판단, 최종 검수)을 제외한
+대부분의 작업을 **명령만으로** 처리하는 것을 목표로, 저장소 자체를 AI 오케스트레이션 파이프라인으로 설계했다.
+「태엽 인간」은 이 파이프라인의 검증 대상으로 제작된 게임이다. 모든 과정은 본 저장소의 커밋 이력으로 추적 가능하다.
+(파이프라인 규칙: `CLAUDE.md` · 명령 정본: `docs/command-catalog.md` · 경위: `HANDOFF.md`)
 
-## 3. 파이프라인 트랙 + 사람 승인 지점
-> [채움] lore/play/art/se/lore-export + `manifest.json`(유기 기록) + **승인 지점**(play spec·art lock·review). [출처] `.claude/commands/*.md`, `pipeline/scripts/*.py`, `pipeline/manifest.json`, `HANDOFF.md` §4
+## 2. 2계층 아키텍처 — AI 산출물을 어떻게 믿는가
 
-## 4. 사용 AI 도구 + 활용 내역 (유의사항 필수)
-> [채움 — 표로: 도구 · 용도 · 산출물]
-> - **Claude / Claude Code (Anthropic)** — 코드·씬 생성(spec→GDScript, 여론 엔진 비트-정확 이식), 게임 텍스트·문서. [출처] `.claude/commands/`, git 이력
-> - **FLUX 등 범용 이미지 모델** — 아트 컨셉 후보 생성(`art concept`). [출처] `.claude/commands/art-concept.md`
-> - **Scenario (커스텀 스타일 모델)** — 스타일 학습(`art lock`) + 에셋 생성(`art gen`), 디젤펑크 고정. [출처] `pipeline/scripts/scenario_client.py`, `manifest.style_guide`, `docs/style_guide.md`
-> - **lore export** — 세계관 정합 게임 텍스트(댓글) 대량 생성·검증. [출처] `pipeline/scripts/lore_export.py`
-> [팁] 각 도구가 **무엇을 얼마나** 만들었는지 활용 내역을 구체 수치로(예: 댓글 87→132, 아트 3종).
+AI가 생성한 게임 로직을 그대로 믿지 않는다. **오라클(정답 기준)과의 대조**로 증명한다.
 
-## 5. AI 대상 주요 프롬프트 · 지시 사항 (공식 요구)
-> [채움] 대표 명령/프롬프트 3~5개를 목적과 함께. 예: play spec(아이디어→명세), art lock(컨셉→스타일 고정), lore export(세계관 정합 댓글), 여론 엔진 이식 지시(비트-정확+parity 대조).
-> [출처] `.claude/commands/*.md`(각 명령의 지시 구조), `docs/command-catalog.md`, `CLAUDE.md`(오케스트레이션 규칙)
-> [팁] "어떤 제약을 걸었는가"(예: src/core는 승인 spec 없이 수정 금지, config 단일 출처)를 함께 — 프롬프트 설계의 판단력.
+- **검증 계층** `sim/opinion-model/` (JS, 웹 빌드에서 제외): 여론 확산 모델의 원본 구현 + 시뮬레이션 러너. 이식의 "정답".
+- **런타임 계층** `src/core/` (GDScript): AI(Claude Code)가 오라클을 **비트-정확(bit-exact)** 이식한 게임 엔진.
+- **단일 출처 config**: `src/core/data/opinion_config.json` 하나를 오라클과 게임이 같이 읽는다 — 상수 드리프트 원천 차단.
+- **증명**: `pipeline/tests/opinion_parity_test.gd` — RNG(mulberry32) 출력 uint32 16개 정수 완전 일치,
+  1턴 시나리오 세그먼트 값 부동소수 동일(0.522621…), 발각 경로 8턴 확률·발동 일치. CI에서 재검증 가능.
 
-## 6. AI 쓴 곳 vs 의도적으로 안 쓴 곳 ★
-> [채움] **썼다**: 아트(FLUX/Scenario)·코드(Claude Code)·텍스트(lore export). **안 썼다(의도적)**: 여론 엔진(검증된 결정론 모델)·효과음(jsfxr 절차생성)·밸런싱(몬테카를로 N=4000)·최종 검수(사람).
-> [출처] `src/core/opinion_model.gd`, `se_jsfxr.py`/`se_node`, `sim/opinion-model/balance_montecarlo.mjs`+`docs/build/c6_balance.md`
-> [팁] "안 쓴 지점이 신뢰성·재현성을 만든다"로 마무리 — 승부처.
+## 3. 파이프라인 트랙과 사람 승인 지점
 
-## 7. 외부 에셋 / 오픈소스 출처 · 라이선스 (유의사항 필수)
-> [채움 — 표로: 항목 · 출처 · 라이선스 · 용도] · 확실치 않은 라이선스는 반드시 원본 확인.
-> - **Godot Engine 4.x** — godotengine.org — MIT — 게임 엔진
-> - **jsfxr** (효과음 절차생성) — 퍼블릭 도메인(코드 주석 근거 `se_jsfxr.py`) — SE 생성
-> - **neodgm 한글 폰트** — `[출처·라이선스 확인]` (`assets/fonts/neodgm.ttf`) — 웹 한글 렌더
-> - **아트 에셋(desk_bg·window frame·gauge 등)** — **자체 생성**(Scenario 커스텀 스타일 모델, FLUX 컨셉) — 저작권 자체 보유, 생성 도구 명시
-> - **효과음(.ogg)** — **자체 생성**(jsfxr 절차생성, 재현 spec `pipeline/se_specs/`) — 외부 에셋 아님
-> - **파이프라인 의존성** — `wasm-media-encoders`, `certifi` 등 `[각 라이선스 확인]` (`pipeline/scripts/se_node/package.json`, `requirements` 류)
-> [팁] "AI 생성 에셋 = 어떤 도구로 생성했는지 명시" + "외부 라이브러리 = 라이선스 명시". 하나라도 누락 시 유의사항 위배.
+| 트랙 | 명령 | AI가 하는 일 | 사람이 하는 일 |
+|---|---|---|---|
+| lore (세계관) | `lore init/query/check/export` | canon 문서 생성·검색·모순 검사·게임 텍스트 생성 | 컨셉 문답, 승인 |
+| play (로직) | `play spec/build/test` | 명세→GDScript+씬 구현, 헤드리스 테스트 | **spec 승인**(생략 불가) |
+| art (그래픽) | `art concept/lock/gen/reskin` | 컨셉 생성→스타일 학습→에셋 생성→씬 교체 | **art lock 승인**(생략 불가) |
+| se (사운드) | `se gen/attach` | 절차 생성→라우드니스 정규화→씬 자동 연결 | 검수 |
+| 공통 | `plan/verify/review/status` | 태스크 분해, 5게이트 검증, 현황 보고 | **review 승인**(생략 불가) |
+
+트랙 간 연결은 `pipeline/manifest.json` 단일 기록을 경유한다 — "어떤 씬 노드/코드 이벤트가 어떤 에셋을 필요로 하는가"를
+기계가 읽을 수 있게 기록하고, `verify`가 매니페스트↔실제 파일 정합성을 게이트로 검사한다.
+
+## 4. 사용 AI 도구 + 활용 내역 (필수 기재)
+
+| 도구 | 용도 | 산출물 (수치) |
+|---|---|---|
+| **Claude / Claude Code** (Anthropic) | 코드·씬 생성(spec→GDScript), 여론 엔진 비트-정확 이식, UI 전체·연출, 파이프라인 스크립트(Python) 작성, 게임 텍스트 생성·문서 | 게임 UI `src/ui/main.gd`(약 1,900줄)·코어 이식 3파일, 파이프라인 스크립트 15종+, 제출 문서 |
+| **FLUX (범용 이미지 모델, Scenario 플랫폼 경유)** | `art concept` — 스타일 확정 전 컨셉 후보 탐색 | 디젤펑크 컨셉 **13종** 생성 → 사람이 선별 |
+| **Scenario (커스텀 스타일 모델 학습·생성)** | `art lock`(선별 컨셉으로 스타일 모델 학습, 2026-08-01 사람 승인) + `art gen` | 스타일 모델 `taeyeop-dieselpunk` 고정(`docs/style_guide.md`), UI 아트 — 책상 배경(점등 변형 포함)·창 프레임·여론계 게이지 |
+| **lore export** (Claude 생성 + 기계 검증) | 세계관(canon) 정합 게임 텍스트 대량 생성 — 스키마·topic 정본·중복·노출 불가 조합을 스크립트(`pipeline/scripts/lore_export.py`)가 차단 | 댓글 뱅크 **87→132건** 확장(세그먼트×반응 셀 전부 11건+, topic 10종 균형) |
+| **Gemini** (Google) | 초기 데스크 배경 시안 등 외부 생성 이미지 시안 | 시안(최종 에셋은 Scenario 재생성분 사용) |
+
+## 5. AI 대상 주요 프롬프트 · 지시 사항
+
+대표 명령과 그 안에 설계된 **제약**(프롬프트 엔지니어링의 핵심):
+
+1. **여론 엔진 이식 지시** — "sim의 JS 모델을 GDScript로 **비트-정확** 이식하라. JS `Math.imul` 의미를 16비트 분할 곱으로 재현하고,
+   골든 픽스처(uint32 16개·1턴 시나리오)와 대조 테스트를 함께 작성하라." → 결과가 §2의 parity 증명.
+2. **`play spec`** — "아이디어를 승인 가능한 구현 명세로 변환하라. 대상 파일·수용 기준(관찰 가능한 것만)·자동 검증 방법을 포함하라.
+   **`src/core/`는 승인된 spec 없이 수정 금지**." → 사람 결정권이 프롬프트 규칙으로 강제된다.
+3. **`art lock`** — "선별된 컨셉 5~15장으로 커스텀 스타일 모델을 학습하되, **잠금(모델 ID 확정·매니페스트 기록)은 사람 승인 후에만** 수행하라."
+4. **`lore export`** — "canon 발췌를 근거로 세그먼트 페르소나(반대층=강철 형제단 어조, 올드미디어=격식체 등)에 맞는 댓글 변주를 생성하라.
+   topic은 canon 정본 10종만, 슬롯은 `{키워드|대상|수치|집단}`만 허용. 산출물은 검증 스크립트를 통과해야만 반영된다."
+5. **오케스트레이션 규칙(`CLAUDE.md`)** — 모든 명령에 공통 주입: "생성→자동 검증→사람 검수→반영 순서 준수,
+   매니페스트 미경유 에셋 금지, canon과 모순되는 산출물 금지."
+
+## 6. AI를 쓴 곳 vs 의도적으로 쓰지 않은 곳 ★
+
+**썼다**: 코드(엔진 이식·UI 전부)·아트(FLUX/Scenario)·게임 텍스트(lore export)·문서. — 생산성이 목적.
+
+**의도적으로 쓰지 않았다**: 신뢰성·재현성이 목적인 축은 결정론으로 못 박았다.
+
+| 축 | 대신 쓴 것 | 이유 |
+|---|---|---|
+| 여론 엔진 런타임 | 검증된 결정론 모델(bounded-confidence+확증편향+역풍) | 결과가 "그럴듯한 생성"이 아니라 **재현 가능한 창발**이어야 함 |
+| 효과음 9종 | jsfxr 절차 생성(시드 고정) + ffmpeg -16 LUFS 정규화 | 동일 spec → 동일 바이트. 외부 저작권 원천 배제 |
+| 밸런싱 | 몬테카를로 시뮬레이션 **N=4,000** (`balance_montecarlo.mjs`) | "정직만으론 못 이기고, 과욕은 수학적으로 벌받는" 난이도 곡선을 실측으로 확정(`docs/build/c6_balance.md`) |
+| 최종 검수 | 사람 (승인 지점 3곳 생략 불가) | 결정권은 사람에게 |
+
+**AI가 만든 것을 AI가 아닌 방법으로 검증한다** — 이 분리가 본 프로젝트의 핵심 판단이다.
+
+## 7. 외부 에셋 / 오픈소스 출처 · 라이선스 (필수 기재)
+
+| 항목 | 출처 | 라이선스 | 용도 |
+|---|---|---|---|
+| Godot Engine 4.6.3 | godotengine.org | MIT | 게임 엔진 |
+| Neo둥근모(neodgm) 폰트 | Eunbin Jeong (Dalgona.) — 라이선스 전문 동봉 `assets/fonts/neodgm_ofl_license.txt` | SIL OFL 1.1 | 웹 빌드 한글 렌더 |
+| jsfxr 1.4.1 | github.com/chr15m/jsfxr (npm) | Public Domain(Unlicense) | 효과음 절차 생성 |
+| wasm-media-encoders 0.7.0 | npm | MIT | (개발 도구) WAV 인코딩 |
+| ffmpeg | ffmpeg.org (gyan.dev 빌드) | GPL/LGPL | (개발 도구) 라우드니스 정규화 — 산출 OGG만 게임에 포함, ffmpeg 자체는 미배포 |
+| certifi / Pillow (Python) | PyPI | MPL-2.0 / MIT-CMU | (개발 도구) 파이프라인 스크립트 |
+| **아트 에셋 전부** (배경·창 프레임·게이지 등) | **자체 생성** — FLUX 컨셉 + Scenario 커스텀 스타일 모델(생성 도구 §4 명시) | 자체 보유 | 게임 UI 아트 |
+| **효과음 .ogg 9종** | **자체 생성** — jsfxr(재현 spec `pipeline/se_specs/` 커밋) | 자체 보유 | UI/이벤트 SE |
+| **게임 텍스트 전부** (사실·기사·댓글·canon) | **자체 작성/생성** (사람+Claude, §4·§5) | 자체 보유 | 콘텐츠 |
+
+외부 유료 에셋·타인 저작물 사용 없음. 현실 인물·실제 사건 미등장(완전 가상 세계관, `lore/canon/world.md`).
 
 ## 8. 재현성 · 검증
-> [채움] seeded jsfxr(동일 바이트)·golden+parity·결정론 RNG(mulberry32)·verify/CI 게이트. [출처] `pipeline/se_specs/`, `pipeline/tests/`, `.github/workflows/verify.yml`
+
+- **효과음**: spec JSON(시드 포함)이 저장소에 커밋 — 동일 명령으로 동일 바이트 재생성.
+- **여론 엔진**: 골든 픽스처(`pipeline/tests/fixtures/opinion_golden.json`) + parity 테스트. config 변경 시 골든 재생성 절차 문서화.
+- **결정론 RNG**: mulberry32 이식 — 같은 시드면 발각 굴림까지 sim과 완전 일치.
+- **검증 게이트**: `verify` 5게이트(헤드리스 임포트·스모크·네이밍 규칙·매니페스트 정합·canon 모순) + 파이프라인 자기검증 러너 7종.
+  GitHub Actions가 push/PR마다 전체 실행(`.github/workflows/verify.yml`) — Godot 4.6.3 고정.
+- **밸런싱**: `node sim/opinion-model/balance_montecarlo.mjs` 1회 실행으로 문서의 난이도 표를 소수점까지 재현 가능.
 
 ## 9. KPI · 결론
-> [채움] 명령당 사람 개입 최소화 + "검증 가능한 축은 결정론으로 못 박음". [출처] `HANDOFF.md`(KPI)
+
+파이프라인의 유일한 개선 지표는 **명령 1회당 사람의 개입 시간·횟수**다. 이 게임에서 사람의 개입은
+컨셉 문답, spec 승인 3회, 아트 스타일 승인 1회, 검수·플레이테스트 피드백으로 수렴했고,
+엔진 이식·UI 구현·아트 생성·사운드·텍스트 확장·검증 인프라는 명령으로 처리됐다.
+
+**결론**: AI 활용의 성숙도는 "얼마나 많이 생성했는가"가 아니라 "**생성을 어떻게 검증하고, 어디에 쓰지 않을지를 어떻게 판단했는가**"에 있다.
+2계층 오라클 대조, 생략 불가 승인 지점, 결정론으로 못 박은 축 — 이 세 가지가 본 프로젝트의 답이다.
