@@ -5,6 +5,17 @@ extends SceneTree
 
 const EPS := 1e-9
 const ENDINGS := ["성공", "실패", "발각파탄", "배신파탄"]
+## main.gd 의 _fill_slots 가 치환할 수 있는 슬롯(= COMMENT_SLOTS/SLOT_FALLBACK 키).
+const KNOWN_SLOTS := ["키워드", "대상", "수치", "집단"]
+
+## "{키워드} ... {대상}" → ["키워드", "대상"]
+static func _slot_tokens(text: String) -> Array:
+	var out: Array = []
+	var re := RegEx.new()
+	re.compile("\\{([^}]+)\\}")
+	for m in re.search_all(text):
+		out.append(m.get_string(1))
+	return out
 
 func _ids(tm) -> Array:
 	var a: Array = []
@@ -142,6 +153,63 @@ func _initialize() -> void:
 		print("[FAIL] F7 찬성각인데 흔적 없음/F16 열림 (논조=%s)" % str(rc["frame_label"])); failures += 1
 	else:
 		print("[PASS] 닫힌 분기: F7 찬성각 → 흔적, F16 잠김")
+
+	# 9) 찌라시 자생 — spec: docs/specs/rumor_emergence.md (수용기준 1·2·3·6)
+	#    표현층 RNG 를 고정 시드로 두어 재현 가능하게 검증한다.
+	var tr := TurnManager.new(1)
+	tr._comment_rng.seed = 12345
+	var seen_levels: Array = []
+	var seen_topics: Dictionary = {}
+	var level_regressed := false
+	var slot_leak := false
+	for _t in tr.max_turns:
+		var ids_r: Array = []
+		for b in tr.get_blocks():
+			ids_r.append(b["id"])
+		var rr := tr.publish({"included_ids": ids_r})
+		for x in rr["rumors"]:
+			var lv := int(x["level"])
+			if not seen_levels.is_empty() and lv < int(seen_levels[-1]):
+				level_regressed = true
+			seen_levels.append(lv)
+			seen_topics[str(x["rumor"])] = true
+		# 슬롯 치환은 UI(main.gd COMMENT_SLOTS)가 담당한다. 코어 단계에서는
+		# "UI 가 아는 슬롯만 쓰였는지"를 검사한다 — 새 슬롯명이 콘텐츠에 들어오면
+		# UI 표에 없어 리터럴이 노출되므로 여기서 먼저 잡는다.
+		for c in rr["comments"]:
+			for tok in _slot_tokens(str(c["text"])):
+				if not KNOWN_SLOTS.has(tok):
+					slot_leak = true
+					print("[i] UI 표에 없는 슬롯: {%s}" % tok)
+		if bool(rr["over"]):
+			break
+	if seen_levels.is_empty():
+		print("[FAIL] 찌라시가 한 번도 자생하지 않음"); failures += 1
+	else:
+		print("[PASS] 찌라시 자생: %d건 (강도 %s)" % [seen_levels.size(), str(seen_levels)])
+	if level_regressed:
+		print("[FAIL] 찌라시 강도 역행 발생: %s" % str(seen_levels)); failures += 1
+	else:
+		print("[PASS] 찌라시 강도 단조 증가(역행 없음)")
+	if slot_leak:
+		print("[FAIL] UI 슬롯 표에 없는 토큰이 콘텐츠에 있음(리터럴 노출 위험)"); failures += 1
+	else:
+		print("[PASS] 댓글 슬롯이 전부 UI 치환 가능한 토큰")
+
+	# 소재 게이팅: F7/F16 을 보도하지 않으면 일곱이·소각은 나오지 않는다.
+	var tg := TurnManager.new(1)
+	tg._comment_rng.seed = 999
+	var gated_topics: Dictionary = {}
+	for _t in tg.max_turns:
+		var rg := tg.publish({"included_ids": []})   # 아무것도 보도하지 않음
+		for x in rg["rumors"]:
+			gated_topics[str(x["rumor"])] = true
+		if bool(rg["over"]):
+			break
+	if gated_topics.has("일곱이") or gated_topics.has("소각"):
+		print("[FAIL] 미보도인데 게이팅 소재 등장: %s" % str(gated_topics.keys())); failures += 1
+	else:
+		print("[PASS] 찌라시 게이팅: 미보도 시 일곱이·소각 미등장")
 
 	if failures == 0:
 		print("TURN_RESULT: PASS")

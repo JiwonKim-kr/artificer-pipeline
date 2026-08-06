@@ -32,6 +32,16 @@ var theo_reported: bool = false    # 발견한 형 테오(F15)를 실제로 지�
 # 결정성 불필요, 별도 RNG 로 매 게임 다른 댓글이 나오게 한다.
 var _comment_rng := RandomNumberGenerator.new()
 var _recent_comments: Array = []   # 최근 사용한 댓글 id (쿨다운 큐)
+
+# --- 찌라시 자생(표현층 전용) --- spec: docs/specs/rumor_emergence.md
+# 여론·발각·평판 수치에 일절 영향을 주지 않는다. 검증된 opinion_model 은 무수정이고
+# 난수도 _comment_rng(표현층)만 쓴다 → parity·밸런싱 불변.
+var rumor_heat: float = 0.0        # 누적 열기. 플레이어가 만든 판이 소문을 부른다
+var rumor_level: int = 1           # 강도 1(의혹)→2(확산)→3(확신형). 단조 증가
+var _reported_ever: Dictionary = {}    # 지금까지 한 번이라도 보도한 사실
+var _encountered_ever: Dictionary = {} # 지금까지 한 번이라도 자료로 등장한 사실
+var _rumor_used: Array = []            # 이미 쓴 찌라시 id (재등장 방지)
+var _rumor_last_level: int = 0         # 직전에 발화된 강도 — 역행 금지용
 var f16_unlocked: bool = false     # F16 취재선 개폐 (F7 반대각 보도 시 열림)
 
 func _init(seed: int = 1) -> void:
@@ -116,7 +126,9 @@ func publish(choices: Dictionary) -> Dictionary:
 	var unf_in: int = 0
 	var total_unf: int = 0
 	var reported: Dictionary = {}
+	var available: Dictionary = {}   # 이번 턴 자료로 등장한 사실 (찌라시 게이팅용)
 	for b in get_blocks():
+		available[b["fact"]] = true
 		if b["tag"] == "불리":
 			total_unf += 1
 		if included.has(b["id"]):
@@ -156,10 +168,18 @@ func publish(choices: Dictionary) -> Dictionary:
 		elif not f16_unlocked:
 			branch_hint = "편집장 메일: \"자네가 접었다던 그 태엽인 건, 다른 데서 냄새를 맡은 모양이야.\""
 
+	# 찌라시 자생 — 모델 step 이후(여론 수치와 무관), 댓글 피드에 섞어 보낸다.
+	var rumors: Array = _rumor_step(reported, available)
+	var feed: Array = _select_comments(frame_label, snapshot)
+	feed.append_array(rumors)
+
 	var ending: String = check_ending()
 	return {
 		"snapshot": snapshot,
-		"comments": _select_comments(frame_label, snapshot),
+		"comments": feed,
+		"rumors": rumors,
+		"rumor_level": rumor_level,
+		"rumor_heat": rumor_heat,
 		"distortion": delta,
 		"lean": lean,
 		"frame_value": frame_value,
@@ -202,6 +222,109 @@ func _reaction_for(seg_id: String, micro: Dictionary) -> String:
 	if r is Dictionary and bool(r.get("accepted", false)):
 		return "수용"
 	return "역풍"
+
+# ---------------------------------------------------------------------------
+# 찌라시 자생 (기획서 §6 · 옵션 A: 허위 소문은 플레이어가 아니라 대중이 만든다)
+# ---------------------------------------------------------------------------
+## 이번 턴의 열기를 갱신하고, 굴림에 성공하면 찌라시 댓글을 배열로 돌려준다(0~1개).
+## reported: 이번 턴 보도한 사실 id 집합. available: 이번 턴 자료로 등장한 사실 id 집합.
+func _rumor_step(reported: Dictionary, available: Dictionary) -> Array:
+	var cfg: Dictionary = tuning.get("rumor", {})
+	if cfg.is_empty():
+		return []
+
+	for fid in available:
+		_encountered_ever[fid] = true
+	for fid in reported:
+		_reported_ever[fid] = true
+
+	# 1) 열기 갱신 — 턴 경과 + 이번 턴 다룬 소재의 기여도.
+	rumor_heat += float(cfg.get("heat_per_turn", 0.0))
+	var contrib: Dictionary = cfg.get("contrib", {})
+	for fid in contrib:
+		if reported.has(fid):
+			rumor_heat += float(contrib[fid])
+	# 회피도 신호다 — 비공개가 자료로 왔는데 지면에서 뺐다면 의심이 더 자란다.
+	if available.has("F11") and not reported.has("F11"):
+		rumor_heat += float(cfg.get("avoid_bonus", 0.0))
+
+	# 2) 강도 — 임계 구간으로 올리되 내려가지 않는다.
+	var thresholds: Array = cfg.get("level_thresholds", [0.0])
+	var lv: int = 1
+	for i in thresholds.size():
+		if rumor_heat >= float(thresholds[i]):
+			lv = i + 1
+	rumor_level = maxi(rumor_level, lv)
+
+	# 3) 자생 굴림 — 표현층 RNG 사용(모델 RNG 와 분리).
+	var p: float = clampf(
+		float(cfg.get("p_base", 0.0)) + rumor_heat * float(cfg.get("heat_gain", 0.0)),
+		0.0, float(cfg.get("p_max", 1.0)))
+	if _comment_rng.randf() >= p:
+		return []
+
+	# 4) 소재 게이팅 — 맥락이 열린 소문만 후보.
+	var open_topics: Dictionary = {}
+	var gates: Dictionary = cfg.get("gates", {})
+	for topic in gates:
+		var g: Variant = gates[topic]
+		if not (g is Dictionary):
+			continue
+		var mode: String = str((g as Dictionary).get("mode", "reported"))
+		var need: Array = (g as Dictionary).get("facts", [])
+		var ok: bool = not need.is_empty()
+		for fid in need:
+			var seen: bool = _reported_ever.has(fid) if mode == "reported" \
+				else _encountered_ever.has(fid)
+			if not seen:
+				ok = false
+				break
+		if ok:
+			open_topics[topic] = true
+	if open_topics.is_empty():
+		return []
+
+	# 5) 후보 추출 — 현재 강도 이하 중 가장 높은 단계를 고른다(그 소재에 3단계가
+	#    없으면 있는 데까지). 이미 쓴 것은 제외.
+	var segs: Array = cfg.get("segments", [])
+	var pool: Array = _rumor_pool(open_topics, segs, true)
+	if pool.is_empty():
+		# 해당 강도의 소재를 다 썼다면 재사용을 허용한다. 한 번 확신형까지 간 소문이
+		# 다시 "의혹 씨앗"으로 약해지는 것보다 반복이 낫다(서사 역행 금지).
+		pool = _rumor_pool(open_topics, segs, false)
+	if pool.is_empty():
+		return []
+
+	var pick: Dictionary = pool[_comment_rng.randi() % pool.size()]
+	_rumor_used.append(str(pick.get("id", "")))
+	_rumor_last_level = maxi(_rumor_last_level, int(pick.get("level", 1)))
+	# {슬롯} 치환은 UI(main.gd _fill_slots)가 topic 기준 표로 처리한다 — 여기서 채우면
+	# 맥락 없는 값이 들어가 오히려 품질이 떨어진다(단일 소유자 유지).
+	return [pick]
+
+## 현재 강도 구간(직전 발화 이상 ~ rumor_level 이하)의 후보를 모은다.
+## fresh=true 면 이미 쓴 id 를 제외한다.
+func _rumor_pool(open_topics: Dictionary, segs: Array, fresh: bool) -> Array:
+	var pool: Array = []
+	var best_lv: int = 0
+	for c in content.get("comments", []):
+		var r: String = str(c.get("rumor", ""))
+		if r == "" or not open_topics.has(r):
+			continue
+		if not segs.is_empty() and not segs.has(str(c.get("seg", ""))):
+			continue
+		var clv: int = int(c.get("level", 1))
+		if clv > rumor_level or clv < _rumor_last_level:
+			continue   # 강도 역행 금지
+		if fresh and _rumor_used.has(str(c.get("id", ""))):
+			continue
+		if clv > best_lv:
+			best_lv = clv
+			pool.clear()
+		if clv == best_lv:
+			pool.append(c)
+	return pool
+
 
 ## 반복방어(기획서 9.3): seg+reaction 후보 풀 → 쿨다운 제외 → frame 가점 가중 랜덤.
 ## 같은 템플릿이 연속으로 재등장하지 않게 해 "가짜 티"를 막는다.
