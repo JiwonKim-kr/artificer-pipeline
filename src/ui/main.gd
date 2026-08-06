@@ -1689,14 +1689,18 @@ func _on_publish() -> void:
 	var pub_turn: int = _tm.model.turn + 1  # 발행 대상 턴(publish 가 턴을 올리기 전)
 	var det_before: int = _tm.model.detections.size()
 	var result := _tm.publish({"included_ids": included})
-	article_published.emit()
 	if _tm.model.detections.size() > det_before:
 		distortion_detected.emit()  # 이번 턴에 왜곡이 새로 들통났다
-	_render_comments(result["comments"])
 	var snap: Dictionary = result["snapshot"]
 	var swing: float = float(snap["xs"]["sns_swing"])
 	_set_needle(float(snap["tvMacro"]), swing)
 	var reported: Array = result["reported_facts"]
+	# 기사를 싣지 않았으면(미보도) 여론이 반응할 게 없으니 발행음·댓글 모두 없다.
+	if reported.is_empty():
+		_render_comments([])   # 빈 목록 → "…반응이 뜸하다"
+	else:
+		article_published.emit()   # 실제 발행 시에만 타자기 소리
+		_render_comments(result["comments"])
 	if not reported.is_empty():
 		_article_history.append({
 			"reported": reported, "frame": str(result["frame_label"]),
