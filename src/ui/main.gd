@@ -14,6 +14,7 @@ const WINDOW_FRAME := "res://assets/art/ui/window/frame.png"
 const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
 # 책상 뒤지기 클로즈업(선택 에셋): 이미지가 들어오면 자동 사용, 없으면 텍스트 연출만.
 const DESK_SEARCH_TEX := "res://assets/art/ui/main/desk_search_closeup.png"
+const NEWSPAPER_FRAME := "res://assets/art/ui/briefing/newspaper_frame.png"  # 브리핑 신문 프레임(9-slice) — art gen 대기, 없으면 크림 폴백
 # 데스크 배경에서 모니터 화면의 중심(뷰포트 비율). 줌 인 트랜지션의 초점.
 # 현 desk_bg.png 실측: 브라운관 유리면 중심 ≈ (0.51, 0.35).
 const MONITOR_FOCUS := Vector2(0.51, 0.35)
@@ -112,6 +113,7 @@ var _article_nav_label: Label        # 오버레이의 "T3 · 2/5" 표시
 var _article_prev_btn: Button
 var _article_next_btn: Button
 var _settings_panel: PanelContainer # 소리 설정 오버레이
+var _briefing_panel: PanelContainer  # 데스크 신문 — 세계관 브리핑(아이젠 공화국·노동 근대화법)
 var _se_vol: float = 0.4            # 효과음 볼륨(0~1, 기본 ≈ -8dB)
 var _bgm_vol: float = 0.5           # 배경음 볼륨(0~1, BGM 추가 대비)
 var _carryover_selected: Array = [] # 「받은 자료」에서 이번 기사에 끌어온 과거 fact id (턴마다 초기화)
@@ -320,6 +322,16 @@ func _build_desk() -> void:
 	drawer_hot.name = "DrawerHotspot"
 	drawer_hot.pressed.connect(_search_desk)
 	_desk.add_child(drawer_hot)
+	# 신문: 좌상단에 놓인 《치차 석간》 — 클릭하면 세계관 브리핑(아이젠 공화국·노동 근대화법).
+	# ⚠ Rect2 는 desk_bg 아트의 신문 위치에 맞춰 미세조정 필요(현재는 좌상단 추정치).
+	var paper_hot := _desk_hotspot(Rect2(0.015, 0.02, 0.205, 0.30))  # 좌상단 신문
+	paper_hot.name = "NewspaperHotspot"
+	paper_hot.pressed.connect(_show_briefing)
+	paper_hot.mouse_entered.connect(func() -> void:
+		if _desk_note != null: _desk_note.text = "책상 위 《치차 석간》 — 읽는다")
+	paper_hot.mouse_exited.connect(func() -> void:
+		if _desk_note != null: _desk_note.text = "")
+	_desk.add_child(paper_hot)
 	_desk_note = Label.new()
 	_desk_note.add_theme_color_override("font_color", Color(0.85, 0.9, 0.78))
 	_desk_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -334,6 +346,7 @@ func _build_desk() -> void:
 	_desk_note.offset_top = 0.0
 	_desk_note.offset_bottom = 0.0
 	_desk.add_child(_desk_note)
+	_build_briefing_panel(_desk)
 
 ## hover 시 데스크 배경을 변형본으로 교체, 벗어나면 원본 복귀.
 func _hover_swap(hot: Button, tex_path: String) -> void:
@@ -606,6 +619,108 @@ func _toggle_settings() -> void:
 		_settings_panel.visible = not _settings_panel.visible
 		if _settings_panel.visible:
 			_settings_panel.move_to_front()
+
+# ---------- 데스크 신문: 세계관 브리핑 ----------
+## 좌상단 신문 클릭 시 뜨는 석간지 지면 — 아이젠 공화국 상황과 「노동 근대화법」 배경.
+func _build_briefing_panel(parent: Control) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "BriefingPanel"
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	panel.custom_minimum_size = Vector2(768, 576)  # 신문 이미지 4:3(1168x880)에 맞춤
+	# 신문 프레임 에셋이 있으면 통째로 깔고(패널이 4:3라 왜곡 없음) 그 위에 텍스트, 없으면 크림 폴백.
+	var frame_tex := _res(NEWSPAPER_FRAME) as Texture2D
+	if frame_tex != null:
+		var st := StyleBoxTexture.new()
+		st.texture = frame_tex
+		st.set_texture_margin_all(0.0)      # 9-slice 미사용 — 전체 텍스처를 패널에 맞춰 draw
+		st.set_content_margin_all(0.0)      # 내부 콘텐츠는 inner 에서 절대 배치(명패/본문)
+		panel.add_theme_stylebox_override("panel", st)
+	else:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.91, 0.87, 0.77)      # 바랜 신문지(폴백)
+		sb.set_border_width_all(2)
+		sb.border_color = Color(0.32, 0.27, 0.19)
+		sb.set_content_margin_all(24)
+		panel.add_theme_stylebox_override("panel", sb)
+	var ink := Color(0.11, 0.09, 0.06)
+	# 콘텐츠는 절대 배치(명패/본문)로 프레임에 맞춘다 — PanelContainer 가 inner 를 패널 전체에 채운다.
+	var inner := Control.new()
+	panel.add_child(inner)
+
+	# 마스트헤드 "치차 석간" 은 프레임 에셋에 박혀 있음(코드 라벨 불필요).
+	# 닫기(우상단)
+	var x := Button.new()
+	x.text = " X "
+	x.anchor_left = 1.0
+	x.anchor_right = 1.0
+	x.anchor_top = 0.0
+	x.anchor_bottom = 0.0
+	x.offset_left = -54.0
+	x.offset_right = -14.0
+	x.offset_top = 12.0
+	x.offset_bottom = 44.0
+	x.pressed.connect(func() -> void: panel.visible = false)
+	inner.add_child(x)
+
+	# 본문 영역: 마스트헤드 아래·괘선 안쪽 (앵커 fill + 여백 오프셋)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	vb.anchor_left = 0.0
+	vb.anchor_top = 0.0
+	vb.anchor_right = 1.0
+	vb.anchor_bottom = 1.0
+	vb.offset_left = 64.0
+	vb.offset_top = 186.0    # "표결 D-8" 줄 제거분 보정 — 헤드라인 위치 유지
+	vb.offset_right = -64.0
+	vb.offset_bottom = -50.0
+	inner.add_child(vb)
+	var head := Label.new()
+	head.text = "「노동 근대화법」 표결 임박 — 치차, 여론의 시험대에 서다"
+	head.add_theme_color_override("font_color", ink)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(head)
+	vb.add_child(HSeparator.new())
+	# 본문(스크롤)
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vb.add_child(sc)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(body)
+	var paras := [
+		"강철과 매연으로 일어선 제조업 강국 [b]아이젠 공화국[/b]. 그 수도 치차의 의회에 「노동 근대화법」이 상정됐다. 태엽인 — 태엽으로 움직이는 자동인형 — 의 공장 노동을 전면 합법화하고, 인간을 대체할 수 있는 상한마저 철폐하는 법이다.",
+		"발의자는 산업위원회의 하겐 소여 위원장. 최대 제조사 [b]모르겐社[/b]가 시범공장을 앞세워 '생산성 42% 증가'를 내세운다. 위험한 고온 주조·갱도 공정에서 인명 사고가 사라졌다는 것도 찬성 측의 근거다.",
+		"그러나 그늘도 짙다. 해고 예고는 8,200명, 재교육 정원은 1,900명뿐. 남은 6,300명의 자리는 계획조차 없다. 태엽인이 들어온 구역에선 남은 노동자의 임금마저 깎였고, 공장 앞에선 노조와 사병이 부딪쳤다. 스스로 이름을 지었다는 한 태엽인을 두고 '자아가 있는가'라는 논쟁까지 불붙었다.",
+		"표결은 여드레 뒤. 올드미디어를 신봉하는 산업가와, 확증에 갇힌 노조 사이에서 승부를 가를 이들은 결국 [b]SNS 부동층[/b] — 흔들리는 젊은 도시민이다. 무엇을 싣고 무엇을 덮느냐에 따라 이 도시의 여론은 어느 쪽으로든 기운다.",
+		"— 그리고 그 지면을 쥔 사람이, 바로 당신이다.",
+	]
+	for t in paras:
+		var l := RichTextLabel.new()
+		l.bbcode_enabled = true
+		l.fit_content = true
+		l.scroll_active = false
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_color_override("default_color", ink)
+		l.text = str(t)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		body.add_child(l)
+	var close := Button.new()
+	close.text = "지면을 접는다"
+	close.pressed.connect(func() -> void: panel.visible = false)
+	vb.add_child(close)
+	panel.visible = false
+	parent.add_child(panel)
+	_briefing_panel = panel
+
+func _show_briefing() -> void:
+	if _briefing_panel != null:
+		_briefing_panel.visible = true
+		_briefing_panel.move_to_front()
 
 func _on_vol_changed(bus_name: String, v: float) -> void:
 	if bus_name == "SE":
