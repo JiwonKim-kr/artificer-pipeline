@@ -1695,9 +1695,12 @@ func _on_publish() -> void:
 	var swing: float = float(snap["xs"]["sns_swing"])
 	_set_needle(float(snap["tvMacro"]), swing)
 	var reported: Array = result["reported_facts"]
-	# 기사를 싣지 않았으면(미보도) 여론이 반응할 게 없으니 발행음·댓글 모두 없다.
+	# 기사를 싣지 않았으면(미보도) 반응할 기사가 없으니 발행음·세그먼트 댓글은 없다.
+	# 단 찌라시는 지면과 무관하게 저들끼리 도는 소문이라 그대로 올린다 — 숨기면 오히려
+	# 자란다는 게 설계(rumor_emergence: avoid_bonus)이고, _rumor_step 이 이미 소재를
+	# 소비한 뒤라 여기서 버리면 그 소문은 영영 나오지 않는다.
 	if reported.is_empty():
-		_render_comments([])   # 빈 목록 → "…반응이 뜸하다"
+		_render_comments(result.get("rumors", []))   # 없으면 "…반응이 뜸하다"
 	else:
 		article_published.emit()   # 실제 발행 시에만 타자기 소리
 		_render_comments(result["comments"])

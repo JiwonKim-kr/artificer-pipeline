@@ -296,6 +296,25 @@
           "action": "generated"
         }
       ]
+    },
+    {
+      "id": "art:ui/briefing/newspaper_frame",
+      "track": "art",
+      "status": "generated",
+      "spec": "데스크 신문 브리핑 오버레이의 석간지 지면 프레임. FLUX 2 Flex 종이 신문 생성 + 명패에 「치차 석간」 명조 합성(2026-08-06). 패널 전체 draw(9-slice 미사용), 4:3 비율.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::NEWSPAPER_FRAME"
+        }
+      ],
+      "file": "assets/art/ui/briefing/newspaper_frame.png",
+      "history": [
+        {
+          "at": "2026-08-06T06:29:28.434339+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }
