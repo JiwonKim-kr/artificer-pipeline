@@ -63,6 +63,15 @@ const ENDINGS := {
 	"배신파탄": "의뢰를 저버린 대가. 모르겐社가 등을 돌리고, 당신은 편집국에서 쫓겨난다.",
 }
 
+## 엔딩별 전체화면 배경 그림(없으면 배경 없이 텍스트만).
+const ENDING_BG := {
+	"성공": "res://assets/art/ui/endings/success.png",
+	"실패": "res://assets/art/ui/endings/failure.png",
+	"발각파탄": "res://assets/art/ui/endings/exposed.png",
+	"배신파탄": "res://assets/art/ui/endings/betrayal.png",
+}
+const EDITOR_PORTRAIT := "res://assets/art/ui/mail/editor.png"  # 편집장 메일 초상
+
 ## 성공 엔딩의 후일담(정직/냉혹). turn_manager.epilogue() 가 고른다.
 const EPILOGUES := {
 	"정직": "당신은 짜맞춘 진실로 이겼다. 무엇을 지면에서 뺐는지는, 당신만 안다.",
@@ -1014,9 +1023,27 @@ func _build_taskbar(parent: Control) -> void:
 	_taskbar_day.text = "제 1 일 / %d" % _tm.max_turns
 	_taskbar_day.add_theme_color_override("font_color", Color(0.75, 0.8, 0.7))
 	row.add_child(_taskbar_day)
+	# 소리 설정: 태스크바에서 눈에 띄게 브라스 하이라이트 버튼으로.
 	var settings_btn := Button.new()
 	settings_btn.name = "SettingsButton"
-	settings_btn.text = "소리"
+	settings_btn.text = "♪ 소리 설정"
+	settings_btn.tooltip_text = "효과음·배경음 볼륨 조절"
+	settings_btn.custom_minimum_size = Vector2(112, 26)
+	var nb := StyleBoxFlat.new()
+	nb.bg_color = Color(0.30, 0.20, 0.09, 0.98)
+	nb.border_color = Color(0.85, 0.62, 0.26)
+	nb.set_border_width_all(1)
+	nb.set_corner_radius_all(3)
+	nb.set_content_margin_all(4)
+	var nh := nb.duplicate() as StyleBoxFlat
+	nh.bg_color = Color(0.44, 0.30, 0.13, 0.99)
+	nh.border_color = Color(1.0, 0.80, 0.38)
+	settings_btn.add_theme_stylebox_override("normal", nb)
+	settings_btn.add_theme_stylebox_override("hover", nh)
+	settings_btn.add_theme_stylebox_override("pressed", nh)
+	settings_btn.add_theme_stylebox_override("focus", nb)
+	settings_btn.add_theme_color_override("font_color", Color(1.0, 0.88, 0.6))
+	settings_btn.add_theme_color_override("font_hover_color", Color(1.0, 0.94, 0.74))
 	settings_btn.pressed.connect(_toggle_settings)
 	row.add_child(settings_btn)
 	_update_taskbar_state()
@@ -1128,6 +1155,17 @@ func _push_mail(sender: String, subject: String, body: String) -> void:
 	if _mail_list == null:
 		return
 	var row := VBoxContainer.new()
+	# 편집장 메일이면 상단에 편집장 초상 배너(압박이 얼굴로 온다).
+	if sender == "편집장":
+		var portrait := _res(EDITOR_PORTRAIT) as Texture2D
+		if portrait != null:
+			var pic := TextureRect.new()
+			pic.texture = portrait
+			pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			pic.custom_minimum_size = Vector2(0, 128)
+			pic.clip_contents = true
+			pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(pic)
 	var head := Label.new()
 	head.text = "▸ %s  —  %s" % [subject, sender]
 	head.add_theme_color_override("font_color", Color(0.95, 0.8, 0.5))
@@ -1483,7 +1521,7 @@ func _refresh_draft() -> void:
 		return
 	for c in _draft_box.get_children():
 		_draft_box.remove_child(c)
-		c.free()
+		c.queue_free()  # X버튼 pressed 시그널 방출 중 free() 금지 → 지연 삭제
 	if _draft_ids.is_empty():
 		var empty := Label.new()
 		empty.text = "(빈 원고)\n\n정보 폴더의 파일을 여기로 끌어오세요.\n아무것도 싣지 않고 발행하면 미보도가 됩니다."
@@ -1520,7 +1558,7 @@ func _refresh_blocks() -> void:
 		return
 	for c in _folder_box.get_children():
 		_folder_box.remove_child(c)
-		c.free()
+		c.queue_free()  # free() 는 시그널(더블클릭 gui_input) 방출 중 '잠긴 객체' 에러 → 지연 삭제
 	var facts: Dictionary = _tm.content.get("facts", {})
 	var cur_turn: int = _cur_turn()
 	var last_fact := ""
@@ -1529,9 +1567,8 @@ func _refresh_blocks() -> void:
 		var fid: String = str(b["fact"])
 		var fdict: Dictionary = facts.get(fid, {})
 		var is_today: bool = _is_today_fact(fdict, cur_turn)
-		# 폴더에는 오늘 것 + 「받은 자료」에서 끌어온 과거 사실만(난잡·과부하 방지).
-		if not is_today and not _carryover_selected.has(fid):
-			continue
+		# 폴더 = 지금까지 모은 모든 정보(기사 작성 워크스페이스). 오늘/이월은 마커로만 구분.
+		# (정보원 패널은 '오늘 입수'만 유지 — 서사 전달 / 폴더는 전체 접근 — 작성.)
 		shown_any = true
 		if fid != last_fact:
 			last_fact = fid
@@ -1859,6 +1896,17 @@ func _first_sentence(s: String) -> String:
 	var idx: int = s.find("다.")
 	return s.substr(0, idx + 2) if idx >= 0 else s
 
+## fact 의 프레임 본문을 반환. 해당 프레임이 없으면 중립 → 아무 프레임으로 폴백(빈 dict 면 "").
+## F15(형 테오)처럼 특정 프레임 본문이 없는 사실도 기사에 반영되게 한다.
+func _frame_body(fb: Dictionary, frame: String) -> String:
+	if fb.has(frame):
+		return str(fb[frame])
+	if fb.has("중립"):
+		return str(fb["중립"])
+	if not fb.is_empty():
+		return str(fb.values()[0])
+	return ""
+
 func _render_article(reported: Array, frame_label: String, body_lines: Array) -> void:
 	if _article_box == null:
 		return
@@ -1889,9 +1937,10 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 	# 본문: 리드 사실 prose + 보조 사실도 문단 전체(최대 2건) + 나머지는 단신 한 줄.
 	# 문단 수가 늘어 '전문'답게 읽힌다. prose 없으면 블록 나열 폴백.
 	var lbodies: Dictionary = lf.get("bodies", {})
-	if lbodies.has(frame_label):
+	var lead_body := _frame_body(lbodies, frame_label)
+	if lead_body != "":
 		var lead := Label.new()
-		lead.text = str(lbodies[frame_label])
+		lead.text = lead_body
 		lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lead.add_theme_color_override("font_color", Color(0.88, 0.9, 0.82))
 		_article_box.add_child(lead)
@@ -1901,18 +1950,20 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 			if str(fid) == lead_fid:
 				continue
 			var fb: Dictionary = (facts.get(fid, {}) as Dictionary).get("bodies", {})
-			if not fb.has(frame_label):
+			# 해당 프레임 본문이 없어도(F15 찬성각 등) 중립/폴백으로 — 실은 사실은 항상 기사에 반영.
+			var btxt := _frame_body(fb, frame_label)
+			if btxt == "":
 				continue
 			if full_paras < 2:
 				var sp := Label.new()
-				sp.text = str(fb[frame_label])
+				sp.text = btxt
 				sp.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				sp.add_theme_color_override("font_color", Color(0.8, 0.83, 0.76))
 				_article_box.add_child(sp)
 				full_paras += 1
 			elif briefs < 2:
 				var sl := Label.new()
-				sl.text = "— 한편, " + _first_sentence(str(fb[frame_label]))
+				sl.text = "— 한편, " + _first_sentence(btxt)
 				sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				sl.add_theme_color_override("font_color", Color(0.68, 0.72, 0.66))
 				_article_box.add_child(sl)
@@ -1935,12 +1986,41 @@ func _show_ending(ending: String, epi: String = "") -> void:
 	ending_reached.emit()
 	if _pub_button != null:
 		_pub_button.disabled = true
+	# 전체화면 엔딩 배경: 그림 + 어둠 스크림(텍스트 가독). 그림 없으면 어둠만.
+	var backdrop := Control.new()
+	backdrop.name = "EndingBackdrop"
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP  # 뒤 게임 클릭 차단
+	var img_tex := _res(str(ENDING_BG.get(ending, ""))) as Texture2D
+	if img_tex != null:
+		var tr := TextureRect.new()
+		tr.texture = img_tex
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		backdrop.add_child(tr)
+	var scrim := ColorRect.new()
+	scrim.color = Color(0.04, 0.03, 0.02, 0.5 if img_tex != null else 0.85)
+	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	backdrop.add_child(scrim)
+	if _os != null:
+		_os.add_child(backdrop)
+
 	var panel := PanelContainer.new()
 	panel.name = "EndingOverlay"
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH  # 중심에서 대칭으로 자라 정중앙에 오게
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	panel.custom_minimum_size = Vector2(660, 200)
+	panel.custom_minimum_size = Vector2(680, 200)
+	# 그림 위에서 읽히게 어두운 반투명 카드.
+	var psb := StyleBoxFlat.new()
+	psb.bg_color = Color(0.05, 0.04, 0.03, 0.86)
+	psb.set_border_width_all(1)
+	psb.border_color = Color(0.62, 0.46, 0.22)
+	psb.set_corner_radius_all(4)
+	psb.set_content_margin_all(26)
+	panel.add_theme_stylebox_override("panel", psb)
 	var vb := VBoxContainer.new()
 	panel.add_child(vb)
 	var title := Label.new()
@@ -1964,11 +2044,15 @@ func _show_ending(ending: String, epi: String = "") -> void:
 		vb.add_child(epi_label)
 	if _os != null:
 		_os.add_child(panel)
-		# 엔딩은 갑자기 박히지 않고 무겁게 떠오른다(페이드 + 미세 상승).
+		# 배경이 먼저 무겁게 떠오르고, 텍스트 카드가 뒤이어 페이드 인.
+		backdrop.modulate = Color(1, 1, 1, 0)
 		panel.modulate = Color(1, 1, 1, 0)
 		var tw := create_tween()
-		tw.tween_property(panel, "modulate:a", 1.0, 0.8) \
+		tw.set_parallel(true)
+		tw.tween_property(backdrop, "modulate:a", 1.0, 0.9) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(panel, "modulate:a", 1.0, 1.0) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).set_delay(0.3)
 
 ## 세그먼트 페르소나에 맞는 랜덤 핸들. 같은 base 도 숫자 접미(약 70%)로 변주.
 func _comment_handle(seg: String) -> String:
