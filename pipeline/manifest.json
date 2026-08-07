@@ -315,6 +315,44 @@
           "action": "generated"
         }
       ]
+    },
+    {
+      "id": "bgm:ambient/room",
+      "track": "bgm",
+      "status": "generated",
+      "spec": "밤의 편집국 앰비언트 베드 — 전력망 험(50/100/150Hz) + 핑크노이즈 방 공기 + 램프 명멸 트레몰로. 타이틀·데스크 상태용. 30s 심리스 루프, 스테레오, -26 LUFS. ffmpeg 절차 합성(pipeline/scripts/bgm_gen.py --bed room).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::BGM_ROOM"
+        }
+      ],
+      "file": "assets/audio/bgm/room_ambient.ogg",
+      "history": [
+        {
+          "at": "2026-08-07T06:18:58.669905+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "bgm:ambient/crt",
+      "track": "bgm",
+      "status": "generated",
+      "spec": "브라운관 앞 앰비언트 베드 — room + 편향코일 험(120/240Hz) + 형광등 버즈 배음. CRT 화면 상태(플레이 루프)용. 30s 심리스 루프, 스테레오, -26 LUFS. ffmpeg 절차 합성(pipeline/scripts/bgm_gen.py --bed crt).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::BGM_CRT"
+        }
+      ],
+      "file": "assets/audio/bgm/crt_room.ogg",
+      "history": [
+        {
+          "at": "2026-08-07T06:18:58.704325+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }

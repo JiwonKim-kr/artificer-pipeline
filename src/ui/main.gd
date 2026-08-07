@@ -15,6 +15,12 @@ const CRT_SHADER := "res://src/ui/shaders/crt_screen.gdshader"
 # 책상 뒤지기 클로즈업(선택 에셋): 이미지가 들어오면 자동 사용, 없으면 텍스트 연출만.
 const DESK_SEARCH_TEX := "res://assets/art/ui/main/desk_search_closeup.png"
 const NEWSPAPER_FRAME := "res://assets/art/ui/briefing/newspaper_frame.png"  # 브리핑 신문 프레임(9-slice) — art gen 대기, 없으면 크림 폴백
+# 앰비언트 베드(bgm gen 절차 합성, 30s 심리스 루프). 상태별로 갈아 끼운다.
+# 웹은 사용자 제스처 전 오디오가 차단되므로 타이틀 클릭(_start_game) 이후에만 재생한다.
+const BGM_ROOM := "res://assets/audio/bgm/room_ambient.ogg"  # 타이틀·데스크
+const BGM_CRT := "res://assets/audio/bgm/crt_room.ogg"       # CRT 화면(플레이 루프)
+const BGM_FADE := 0.6      # 상태 전환 페이드(초)
+const BGM_SILENT_DB := -60.0
 # 데스크 배경에서 모니터 화면의 중심(뷰포트 비율). 줌 인 트랜지션의 초점.
 # 현 desk_bg.png 실측: 브라운관 유리면 중심 ≈ (0.51, 0.35).
 const MONITOR_FOCUS := Vector2(0.51, 0.35)
@@ -149,11 +155,15 @@ var _day_stage: int = 0             # 턴 경과 카드 진행 단계(클릭으�
 var _day_done: Callable             # 카드 종료 후 콜백
 var _day_busy: bool = false         # 페이드 중 클릭 무시
 var _booted: bool = false           # _ready 완료 후 true — 부팅 중 창 SE 발화 방지
+var _bgm_player: AudioStreamPlayer  # 앰비언트 베드 재생기(BGM 버스). SE 와 달리 상태 기반이라 코드 생성.
+var _bgm_track: String = ""         # 현재 걸린 트랙 경로 — 같은 트랙 재요청은 무시(끊김 방지)
+var _bgm_tween: Tween
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_apply_font()
 	_load_audio_settings()  # 저장된 볼륨을 SE/BGM 버스에 적용(버스는 default_bus_layout.tres)
+	_build_bgm_player()
 	_tm = TurnManager.new(1)
 	_build_desk()
 	_build_screen()
@@ -275,6 +285,9 @@ func _start_game() -> void:
 	if _transitioning:
 		return
 	_transitioning = true
+	# 타이틀 클릭 = 이 페이지의 첫 사용자 제스처. 웹 오디오 잠금이 여기서 풀리므로
+	# 앰비언트도 여기서 시작한다(타이틀 화면에서 미리 틀면 브라우저가 막는다).
+	_play_bgm(BGM_ROOM)
 	var tw := create_tween()
 	tw.tween_property(_fade_rect, "color:a", 1.0, 0.4)
 	tw.tween_callback(func() -> void:
@@ -282,6 +295,50 @@ func _start_game() -> void:
 		_desk.visible = true)
 	tw.tween_property(_fade_rect, "color:a", 0.0, 0.5)
 	tw.tween_callback(func() -> void: _transitioning = false)
+
+# ---------- 앰비언트 베드(BGM) ----------
+## SE 는 씬 노드 + 시그널 브리지(se attach)지만 BGM 은 시그널이 아니라 화면 상태에
+## 묶이므로 재생기 하나를 코드로 만들어 트랙만 갈아 끼운다.
+func _build_bgm_player() -> void:
+	_bgm_player = AudioStreamPlayer.new()
+	_bgm_player.name = "BgmPlayer"
+	_bgm_player.bus = "BGM"
+	_bgm_player.volume_db = BGM_SILENT_DB
+	add_child(_bgm_player)
+
+## 앰비언트 베드 교체. 같은 트랙이면 무시해 상태를 오갈 때 소리가 끊기지 않게 한다.
+## 에셋이 없으면 조용히 넘어간다(SE·아트와 같은 폴백 원칙).
+func _play_bgm(path: String) -> void:
+	if _bgm_player == null or _bgm_track == path:
+		return
+	var stream := _res(path) as AudioStream
+	if stream == null:
+		return
+	# 루프는 코드에서 켠다 — .import 는 .gitignore 라 임포트 설정으로 잡으면 CI 에서 날아간다.
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	_bgm_track = path
+	if _bgm_tween != null and _bgm_tween.is_valid():
+		_bgm_tween.kill()
+	_bgm_tween = create_tween()
+	if _bgm_player.playing:
+		_bgm_tween.tween_property(_bgm_player, "volume_db", BGM_SILENT_DB, BGM_FADE)
+	_bgm_tween.tween_callback(func() -> void:
+		_bgm_player.stream = stream
+		_bgm_player.volume_db = BGM_SILENT_DB
+		_bgm_player.play())
+	_bgm_tween.tween_property(_bgm_player, "volume_db", 0.0, BGM_FADE)
+
+## 엔딩용. 베드를 빼는 것만으로 충분히 무겁고(ending SE 스팅어가 이미 있다) 트랙이 하나 준다.
+func _stop_bgm(fade: float = 1.6) -> void:
+	if _bgm_player == null or not _bgm_player.playing:
+		return
+	_bgm_track = ""
+	if _bgm_tween != null and _bgm_tween.is_valid():
+		_bgm_tween.kill()
+	_bgm_tween = create_tween()
+	_bgm_tween.tween_property(_bgm_player, "volume_db", BGM_SILENT_DB, fade)
+	_bgm_tween.tween_callback(_bgm_player.stop)
 
 func _res(path: String) -> Resource:
 	return load(path) if ResourceLoader.exists(path) else null
@@ -440,6 +497,7 @@ func _enter_screen() -> void:
 			_desk_bg_rect.texture = _desk_bg_default  # 데스크 복귀 대비 원본 복원
 		_screen.visible = true
 		monitor_powered.emit()
+		_play_bgm(BGM_CRT)  # 모니터 앞 — 편향코일 험이 얹힌 베드로 교체
 		_crt_power_on())
 
 ## CRT 파워온: 암전에서 밝아지며 2번 깜빡 + 스캔라인·색수차가 과했다가 정상치로 안정.
@@ -541,6 +599,7 @@ func _exit_screen() -> void:
 	tw.tween_callback(func() -> void:
 		_screen.visible = false
 		_desk.visible = true
+		_play_bgm(BGM_ROOM)  # 모니터에서 물러남 — 방 베드로 복귀
 		_desk.pivot_offset = get_viewport_rect().size * MONITOR_FOCUS
 		_desk.scale = Vector2(1.6, 1.6))
 	tw.tween_property(_desk, "scale", Vector2.ONE, 0.4) \
@@ -1984,6 +2043,7 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 
 func _show_ending(ending: String, epi: String = "") -> void:
 	ending_reached.emit()
+	_stop_bgm()  # 베드가 빠지면서 남는 정적이 엔딩 스팅어를 받쳐준다
 	if _pub_button != null:
 		_pub_button.disabled = true
 	# 전체화면 엔딩 배경: 그림 + 어둠 스크림(텍스트 가독). 그림 없으면 어둠만.
