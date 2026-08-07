@@ -72,21 +72,25 @@ script = ExtResource("12_se_emitter")
 stream = ExtResource("13_se_stream")
 target_path = NodePath("..")
 signal_name = &"window_opened"
+bus = &"SE"
 
 [node name="SeUiWindowClose" type="AudioStreamPlayer" parent="."]
 script = ExtResource("14_se_emitter")
 stream = ExtResource("15_se_stream")
 target_path = NodePath("..")
 signal_name = &"window_closed"
+bus = &"SE"
 
 [node name="SeUiFileDrop" type="AudioStreamPlayer" parent="."]
 script = ExtResource("16_se_emitter")
 stream = ExtResource("17_se_stream")
 target_path = NodePath("..")
 signal_name = &"file_dropped"
+bus = &"SE"
 
 [node name="SeUiNeonBuzz" type="AudioStreamPlayer" parent="."]
 script = ExtResource("18_se_emitter")
 stream = ExtResource("19_se_stream")
 target_path = NodePath("..")
 signal_name = &"neon_buzz"
+bus = &"SE"
