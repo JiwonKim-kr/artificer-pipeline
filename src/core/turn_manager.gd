@@ -168,9 +168,16 @@ func publish(choices: Dictionary) -> Dictionary:
 		elif not f16_unlocked:
 			branch_hint = "편집장 메일: \"자네가 접었다던 그 태엽인 건, 다른 데서 냄새를 맡은 모양이야.\""
 
+	# 이번 기사가 다룬 주제(보도 사실들의 topic) — 댓글을 이 주제에 맞춰 가중.
+	var article_topics: Dictionary = {}
+	for fid in reported:
+		var ft: Variant = (content.get("facts", {}).get(fid, {}) as Dictionary).get("topic", null)
+		if ft != null:
+			article_topics[str(ft)] = true
+
 	# 찌라시 자생 — 모델 step 이후(여론 수치와 무관), 댓글 피드에 섞어 보낸다.
 	var rumors: Array = _rumor_step(reported, available)
-	var feed: Array = _select_comments(frame_label, snapshot)
+	var feed: Array = _select_comments(frame_label, snapshot, article_topics)
 	feed.append_array(rumors)
 
 	var ending: String = check_ending()
@@ -182,6 +189,8 @@ func publish(choices: Dictionary) -> Dictionary:
 		"rumor_heat": rumor_heat,
 		"distortion": delta,
 		"lean": lean,
+		"fav_in": fav_in,   # 이번 기사에 실은 유리 사실 수
+		"unf_in": unf_in,   # 이번 기사에 실은 불리(비판) 사실 수 — 편집 의도 판정용
 		"frame_value": frame_value,
 		"frame_label": frame_label,
 		"reported_facts": reported.keys(),
@@ -205,12 +214,12 @@ static func _frame_label(p: float) -> String:
 		return "반대각"
 	return "중립"
 
-func _select_comments(frame_label: String, snapshot: Dictionary) -> Array:
+func _select_comments(frame_label: String, snapshot: Dictionary, topics: Dictionary = {}) -> Array:
 	var micro: Dictionary = snapshot.get("micro", {})
 	var out: Array = []
 	for s in model.config["segments"]:
 		var seg_id: String = str(s["id"])
-		var c: Dictionary = _pick_comment(seg_id, _reaction_for(seg_id, micro), frame_label)
+		var c: Dictionary = _pick_comment(seg_id, _reaction_for(seg_id, micro), frame_label, topics)
 		if not c.is_empty():
 			out.append(c)
 	return out
@@ -328,7 +337,7 @@ func _rumor_pool(open_topics: Dictionary, segs: Array, fresh: bool) -> Array:
 
 ## 반복방어(기획서 9.3): seg+reaction 후보 풀 → 쿨다운 제외 → frame 가점 가중 랜덤.
 ## 같은 템플릿이 연속으로 재등장하지 않게 해 "가짜 티"를 막는다.
-func _pick_comment(seg_id: String, reaction: String, frame_label: String) -> Dictionary:
+func _pick_comment(seg_id: String, reaction: String, frame_label: String, topics: Dictionary = {}) -> Dictionary:
 	var pool: Array = []
 	for c in content.get("comments", []):
 		if str(c.get("seg", "")) == seg_id and str(c.get("reaction", "")) == reaction:
@@ -347,6 +356,10 @@ func _pick_comment(seg_id: String, reaction: String, frame_label: String) -> Dic
 		var cf: Variant = c.get("frame", null)
 		if cf != null and str(cf) == frame_label:
 			w += 2.0
+		# 이번 기사가 다룬 주제의 댓글에 큰 가점 → '각 기사에 맞는' 반응이 우선 노출.
+		var ct: Variant = c.get("topic", null)
+		if ct != null and topics.has(str(ct)):
+			w += 3.5
 		weights.append(w)
 		total += w
 	var roll: float = _comment_rng.randf() * total
