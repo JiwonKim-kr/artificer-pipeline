@@ -29,7 +29,7 @@ const MONITOR_FOCUS := Vector2(0.51, 0.35)
 # 'LIE 를 GUIDE 한다'는 이중 의미가 드러난다 (SKYHILL 의 H 점멸 → ILL 강조와 같은 기법).
 const TITLE_TEXT := "GUIDELINE"
 const TITLE_FLICKER_IDX := 7    # 'N' (G0 U1 I2 D3 E4 L5 I6 N7 E8)
-const TITLE_SUB := "치차 석간 — 태엽 인간 사건"
+const TITLE_SUB := "치차 석간, 태엽 인간 사건"
 const NEON_ON := Color(1.0, 0.38, 0.22)          # 네온 레드오렌지(디젤펑크 가스관 사인)
 const NEON_GLOW := Color(1.0, 0.30, 0.12, 0.38)  # 글로우(아웃라인)
 const NEON_OFF := Color(0.28, 0.13, 0.10, 0.35)  # 꺼진 관(희미한 유리관 잔상)
@@ -402,7 +402,7 @@ func _build_desk() -> void:
 	paper_hot.name = "NewspaperHotspot"
 	paper_hot.pressed.connect(_show_briefing)
 	paper_hot.mouse_entered.connect(func() -> void:
-		if _desk_note != null: _desk_note.text = "책상 위 《치차 석간》 — 읽는다")
+		if _desk_note != null: _desk_note.text = "책상 위 《치차 석간》 읽는다")
 	paper_hot.mouse_exited.connect(func() -> void:
 		if _desk_note != null: _desk_note.text = "")
 	_desk.add_child(paper_hot)
@@ -550,7 +550,7 @@ func _build_day_card() -> void:
 	_day_card.add_child(_day_label)
 	var hint := Label.new()
 	hint.name = "ClickHint"
-	hint.text = "— 클릭해서 계속 —"
+	hint.text = "클릭해서 계속"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	hint.offset_top = -70.0
@@ -566,7 +566,7 @@ func _show_day_transition(done: Callable) -> void:
 	_day_done = done
 	_day_stage = 0
 	_day_busy = true
-	_day_label.text = "— 석간 마감. 윤전기가 돈다 —"
+	_day_label.text = "석간 마감. 윤전기가 돈다"
 	_day_card.modulate = Color(1, 1, 1, 0)
 	_day_card.visible = true
 	_day_card.move_to_front()
@@ -753,7 +753,7 @@ func _build_briefing_panel(parent: Control) -> void:
 	vb.offset_bottom = -50.0
 	inner.add_child(vb)
 	var head := Label.new()
-	head.text = "「노동 근대화법」 표결 임박 — 치차, 여론의 시험대에 서다"
+	head.text = "「노동 근대화법」 표결 임박. 치차, 여론의 시험대에 서다"
 	head.add_theme_color_override("font_color", ink)
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(head)
@@ -769,11 +769,11 @@ func _build_briefing_panel(parent: Control) -> void:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(body)
 	var paras := [
-		"강철과 매연으로 일어선 제조업 강국 [b]아이젠 공화국[/b]. 그 수도 치차의 의회에 「노동 근대화법」이 상정됐다. 태엽인 — 태엽으로 움직이는 자동인형 — 의 공장 노동을 전면 합법화하고, 인간을 대체할 수 있는 상한마저 철폐하는 법이다.",
+		"강철과 매연으로 일어선 제조업 강국 [b]아이젠 공화국[/b]. 그 수도 치차의 의회에 「노동 근대화법」이 상정됐다. 태엽인(태엽으로 움직이는 자동인형)의 공장 노동을 전면 합법화하고, 인간을 대체할 수 있는 상한마저 철폐하는 법이다.",
 		"발의자는 산업위원회의 하겐 소여 위원장. 최대 제조사 [b]모르겐 사[/b]가 시범공장을 앞세워 '생산성 42% 증가'를 내세운다. 위험한 고온 주조·갱도 공정에서 인명 사고가 사라졌다는 것도 찬성 측의 근거다.",
 		"그러나 그늘도 짙다. 해고 예고는 8,200명, 재교육 정원은 1,900명뿐. 남은 6,300명의 자리는 계획조차 없다. 태엽인이 들어온 구역에선 남은 노동자의 임금마저 깎였고, 공장 앞에선 노조와 사병이 부딪쳤다. 스스로 이름을 지었다는 한 태엽인을 두고 '자아가 있는가'라는 논쟁까지 불붙었다.",
-		"표결은 여드레 뒤. 올드미디어를 신봉하는 산업가와, 확증에 갇힌 노조 사이에서 승부를 가를 이들은 결국 [b]SNS 부동층[/b] — 흔들리는 젊은 도시민이다. 무엇을 싣고 무엇을 덮느냐에 따라 이 도시의 여론은 어느 쪽으로든 기운다.",
-		"— 그리고 그 지면을 쥔 사람이, 바로 당신이다.",
+		"표결은 여드레 뒤. 올드미디어를 신봉하는 산업가와, 확증에 갇힌 노조 사이에서 승부를 가를 이들은 결국 [b]SNS 부동층[/b], 흔들리는 젊은 도시민이다. 무엇을 싣고 무엇을 덮느냐에 따라 이 도시의 여론은 어느 쪽으로든 기운다.",
+		"그리고 그 지면을 쥔 사람이, 바로 당신이다.",
 	]
 	for t in paras:
 		var l := RichTextLabel.new()
@@ -848,7 +848,7 @@ func _build_archive_panel(parent: Control) -> void:
 	vb.add_theme_constant_override("separation", 8)
 	panel.add_child(vb)
 	var title := Label.new()
-	title.text = "▍ 받은 자료 — 지난 정보를 이 기사에 끌어오기"
+	title.text = "▍ 받은 자료: 지난 정보를 이 기사에 끌어오기"
 	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
 	vb.add_child(title)
 	vb.add_child(HSeparator.new())
@@ -1014,7 +1014,7 @@ func _build_screen() -> void:
 		w.visible = false
 	_build_taskbar(os)
 	# 첫 부팅: 의뢰 메일이 도착해 있고, 수신함이 열린 채 시작한다(온보딩).
-	_push_mail("산업위원회 (발신전용)", "의뢰 — 표결일까지",
+	_push_mail("산업위원회 (발신전용)", "의뢰: 표결일까지",
 		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐 사도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n※ [정보원]에서 오늘 입수분을 확인 → [정보 폴더]의 파일을 [원고]로 끌어다 기사를 만들고 발행할 것." % [
 			_tm.max_turns, int(round(float(_tm.model.config["mission"]["winThreshold"]) * 100.0))])
 	_open_win("mail")
@@ -1213,7 +1213,7 @@ func _update_mail_badge() -> void:
 
 # ---------- 메일 앱 (편집장·압박·분기 메시지 수신함) ----------
 func _make_mail(pos: Vector2, size: Vector2) -> PanelContainer:
-	var panel := _window(pos, size, "수신함 — 치차 석간 내부망")
+	var panel := _window(pos, size, "수신함: 치차 석간 내부망")
 	_mail_list = _scroll_body(_body_of(panel))
 	return panel
 
@@ -1234,7 +1234,7 @@ func _push_mail(sender: String, subject: String, body: String) -> void:
 			pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			row.add_child(pic)
 	var head := Label.new()
-	head.text = "▸ %s  —  %s" % [subject, sender]
+	head.text = "▸ %s  ·  %s" % [subject, sender]
 	head.add_theme_color_override("font_color", Color(0.95, 0.8, 0.5))
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(head)
@@ -1413,7 +1413,7 @@ func _is_today_fact(fdict: Dictionary, cur_turn: int) -> bool:
 
 # 정보원: 오늘 입수한 정보만 보여준다(과부하 방지). 과거 정보는 「받은 자료」 오버레이로.
 func _make_informant(pos: Vector2, size: Vector2) -> Control:
-	var panel := _window(pos, size, "정보원 — 입수 정보")
+	var panel := _window(pos, size, "정보원: 입수 정보")
 	_informant_title = panel.get_meta("title_label") as Label
 	var body := _body_of(panel)
 	_archive_btn = Button.new()
@@ -1474,7 +1474,7 @@ func _refresh_informant() -> void:
 		none.modulate = Color(0.65, 0.65, 0.6)
 		_informant_body.add_child(none)
 	if _informant_title != null:
-		_informant_title.text = "▍ 정보원 — 오늘 입수 %d" % today
+		_informant_title.text = "▍ 정보원 · 오늘 입수 %d" % today
 	if _archive_btn != null:
 		_archive_btn.text = "받은 자료 (%d)" % carried
 		_archive_btn.disabled = carried == 0
@@ -1840,8 +1840,10 @@ func _on_publish() -> void:
 		_article_view_btn.disabled = false
 		_refresh_article_view()
 	var report_txt: String = "미보도" if reported.is_empty() else "보도 %d건" % reported.size()
-	_status_label.text = "%s · 논조 %s(δ=%.2f) · 부동층 %d%%" % [
-		report_txt, str(result["frame_label"]), float(result["distortion"]), int(round(swing * 100.0)),
+	# 논조는 찬성/반대/중립만 노출(δ 등 내부 수치는 숨김 — 플레이어 가독성).
+	var frame_short: String = str(result["frame_label"]).replace("각", "")
+	_status_label.text = "%s · 논조 %s · 부동층 %d%%" % [
+		report_txt, frame_short, int(round(swing * 100.0)),
 	]
 	if _pressure_label != null:
 		_pressure_label.text = str(result["pressure_hint"])
@@ -2026,7 +2028,7 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 		c.queue_free()
 	if reported.is_empty():
 		var none := Label.new()
-		none.text = "(미보도 — 이번 턴 기사를 싣지 않았다)"
+		none.text = "(미보도: 이번 턴 기사를 싣지 않았다)"
 		none.modulate = Color(0.72, 0.72, 0.62)
 		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_article_box.add_child(none)
@@ -2075,7 +2077,7 @@ func _render_article(reported: Array, frame_label: String, body_lines: Array) ->
 				full_paras += 1
 			elif briefs < 2:
 				var sl := Label.new()
-				sl.text = "— 한편, " + _first_sentence(btxt)
+				sl.text = "한편, " + _first_sentence(btxt)
 				sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				sl.add_theme_color_override("font_color", Color(0.68, 0.72, 0.66))
 				_article_box.add_child(sl)
@@ -2138,7 +2140,7 @@ func _show_ending(ending: String, epi: String = "") -> void:
 	panel.add_child(vb)
 	var title := Label.new()
 	var title_suffix: String = "  ·  %s" % epi if epi != "" else ""
-	title.text = "—  %s%s  —" % [ending, title_suffix]
+	title.text = "%s%s" % [ending, title_suffix]
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.44))
 	vb.add_child(title)
