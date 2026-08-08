@@ -77,6 +77,12 @@ const ENDING_BG := {
 	"배신파탄": "res://assets/art/ui/endings/betrayal.png",
 }
 const EDITOR_PORTRAIT := "res://assets/art/ui/mail/editor.png"  # 편집장 메일 초상
+# 편집장 컷신 tier별 초상(1=경고, 2=노려봄, 3=격노). 없으면 EDITOR_PORTRAIT 로 폴백.
+const EDITOR_TIER_PORTRAITS := [
+	"res://assets/art/ui/editor/editor_warn.png",
+	"res://assets/art/ui/editor/editor_glare.png",
+	"res://assets/art/ui/editor/editor_rage.png",
+]
 
 ## 성공 엔딩의 후일담(정직/냉혹). turn_manager.epilogue() 가 고른다.
 const EPILOGUES := {
@@ -97,6 +103,7 @@ signal window_opened         # OS 창 열림 → 팝
 signal window_closed         # OS 창 닫힘/내림 → 역팝
 signal file_dropped          # 정보 파일을 원고에 실음 → 종이 탁
 signal neon_buzz             # 타이틀 네온 지직(점멸 버스트 시작)
+signal editor_knock          # 편집장 분노 컷신 — 문 두드림(쿵) 한 번
 
 var _tm: TurnManager
 var _desk: Control
@@ -117,6 +124,7 @@ var _desk_bg_rect: TextureRect   # 데스크 배경 — hover 시 이 텍스처�
 var _desk_bg_default: Texture2D  # 원본 desk_bg (hover 해제 시 복귀)
 var _desk_note: Label
 var _f16_shown: bool = false
+var _anti_streak: int = 0  # 연속 '반대 기사'(불리>유리) 횟수 — 편집장 반응 강도 결정
 var _informant_body: VBoxContainer  # 정보원 패널 스크롤 본문(턴별 갱신 대상)
 var _informant_title: Label         # 정보원 패널 타이틀(오늘/누적 카운트 표시)
 var _article_box: VBoxContainer     # 발행 기사 오버레이의 스크롤 본문(헤드라인+본문)
@@ -1440,11 +1448,26 @@ func _refresh_informant() -> void:
 		head.text = "%s  %s" % ["· 단서(책상)" if is_clue else "● 오늘 입수", str(f.get("title", ""))]
 		head.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
 		_informant_body.add_child(head)
+		# 상황 설명(중립 산문) — 조각만으로는 맥락을 알기 어려우니 정보원이 배경을 풀어준다.
+		var situ_txt := _frame_body(f.get("bodies", {}), "중립")
+		if situ_txt != "":
+			var situ := Label.new()
+			situ.text = situ_txt
+			situ.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			situ.add_theme_color_override("font_color", Color(0.82, 0.86, 0.78))
+			_informant_body.add_child(situ)
+		# 실을 수 있는 문장(조각) — 실제 선별/발행은 정보 폴더·원고에서.
+		var frag_head := Label.new()
+		frag_head.text = "▤ 실을 수 있는 문장:"
+		frag_head.add_theme_color_override("font_color", Color(0.6, 0.72, 0.6))
+		_informant_body.add_child(frag_head)
 		for frag in f.get("fragments", []):
 			var l := Label.new()
-			l.text = str(frag.get("text", ""))
+			l.text = "   • " + str(frag.get("text", ""))
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.add_theme_color_override("font_color", Color(0.78, 0.78, 0.72))
 			_informant_body.add_child(l)
+		_informant_body.add_child(HSeparator.new())
 	if today == 0:
 		var none := Label.new()
 		none.text = "오늘 새로 들어온 정보가 없습니다."
@@ -1622,7 +1645,16 @@ func _refresh_blocks() -> void:
 	var cur_turn: int = _cur_turn()
 	var last_fact := ""
 	var shown_any := false
+	# 오늘 입수분을 상단, 기존 누적분을 하단으로 정렬(날짜가 지날수록 새 정보가 위에 오게).
+	# get_blocks 는 사실 단위로 연속이므로 두 갈래로 나눠도 사실 그룹은 유지된다.
+	var today_blocks: Array = []
+	var older_blocks: Array = []
 	for b in _tm.get_blocks():
+		if _is_today_fact(facts.get(str(b["fact"]), {}), cur_turn):
+			today_blocks.append(b)
+		else:
+			older_blocks.append(b)
+	for b in (today_blocks + older_blocks):
 		var fid: String = str(b["fact"])
 		var fdict: Dictionary = facts.get(fid, {})
 		var is_today: bool = _is_today_fact(fdict, cur_turn)
@@ -1816,15 +1848,33 @@ func _on_publish() -> void:
 	if _branch_label != null and str(result["branch_hint"]) != "":
 		_branch_label.text = str(result["branch_hint"])
 	# 압박·분기는 편집장 명의의 메일로도 도착한다(계기 비표시 원칙 — 수치 없이 문구만).
-	if str(result["pressure_hint"]) != "":
-		_push_mail("편집장", "위에서 온 이야기", str(result["pressure_hint"]))
+	# 압박(반대 기사)은 메일이 아니라 아래 강제 컷신으로 전달. 분기 힌트만 메일 유지.
 	if str(result["branch_hint"]) != "":
 		_push_mail("편집장", "참고", str(result["branch_hint"]))
 	if bool(result["f16_unlocked"]) and not _f16_shown:
 		_f16_shown = true
 		_refresh_blocks()  # F16 취재선 열림 → 새 문장 블록 등장
+	# '반대 기사' = 비판(불리)을 칭찬(유리)보다 많이 실은 기사(편집 의도). net 프레임(반대각)과
+	# 달리 은폐분과 무관해 날이 지나도 반복 판정 → 편집장이 매번 강제로 맨 위에 등장(메일 아님).
+	var anti_intent: bool = int(result["unf_in"]) > int(result["fav_in"])
+	if anti_intent:
+		_anti_streak += 1
+	else:
+		_anti_streak = 0
+	# 연속 1~2 = 경고 창, 3 = 노려보는 컷신, 4+ = 격화.
+	var editor_tier: int = 0
+	if _anti_streak >= 4:
+		editor_tier = 3
+	elif _anti_streak == 3:
+		editor_tier = 2
+	elif _anti_streak >= 1:
+		editor_tier = 1
 	if bool(result["over"]):
-		_show_ending(str(result["ending"]), str(result.get("epilogue", "")))
+		if str(result["ending"]) == "배신파탄":
+			var epi := str(result.get("epilogue", ""))
+			_show_editor_rage(3, func() -> void: _show_ending("배신파탄", epi), _anti_streak)
+		else:
+			_show_ending(str(result["ending"]), str(result.get("epilogue", "")))
 	else:
 		_update_turn_label()
 		_carryover_selected.clear()  # 새 턴 = 새 기사: 지난 기사에 끌어온 과거 정보는 초기화
@@ -1834,12 +1884,15 @@ func _on_publish() -> void:
 		_refresh_draft()
 		if _archive_panel != null and _archive_panel.visible:
 			_refresh_archive()
-		# 하루 경과 연출 → 기사 지면 팝 + 여론(댓글) 창 자동 오픈.
+		# 하루 경과 연출 → 기사 지면 팝 + 여론 창(+ 반대 기사면 편집장 강제 등장).
+		# 윤전기가 돌고 전문을 확인하는 순간에 문 두드림 소리와 함께 뜬다.
 		var had_article: bool = not reported.is_empty()
 		_show_day_transition(func() -> void:
 			if had_article:
 				_show_article()
-			_open_win("comments"))
+			_open_win("comments")
+			if editor_tier > 0:
+				_show_editor_rage(editor_tier, Callable(), _anti_streak))
 
 func _update_turn_label() -> void:
 	if _turn_label != null and _tm != null:
@@ -2113,6 +2166,151 @@ func _show_ending(ending: String, epi: String = "") -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tw.tween_property(panel, "modulate:a", 1.0, 1.0) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).set_delay(0.3)
+
+## 편집장 분노 컷신. tier 1 = 반대 기사 3회 누적 경고(게임 계속), tier 2 = 배신파탄 직전
+## 격화(닫으면 on_close 로 엔딩 진입). 핏빛 스크림 위 편집장 초상 + 문 두드림(쿵, 화면 흔들림
+## + editor_knock SFX) + 분노 대사. 클릭해 닫는다. CRT 화면 안에 들어오도록 콤팩트하게.
+func _show_editor_rage(tier: int = 1, on_close: Callable = Callable(), variant: int = -1) -> void:
+	if _os == null:
+		if on_close.is_valid():
+			on_close.call()
+		return
+	var ti: int = clampi(tier - 1, 0, 2)
+	var knocks: int = [2, 3, 5][ti]
+	var amp: float = [0.7, 1.2, 1.8][ti]
+	var base_a: float = [0.55, 0.82, 0.92][ti]  # tier1 은 옅게(창 팝업 느낌), 위로 갈수록 암전
+	var col_w: float = [480.0, 520.0, 560.0][ti]
+	var border_col: Color = [Color(0.85, 0.62, 0.26), Color(0.9, 0.28, 0.2), Color(1.0, 0.32, 0.24)][ti]
+	# tier별 대사·문 두드림 풀 — 연속 횟수(variant)로 매번 다른 걸 골라 반복감을 줄인다.
+	var bang_pool: Array = [
+		["쿵— 쿵—", "똑, 똑, 똑—", "쿵, 쿵—"],
+		["쾅— 쾅— 쾅—!", "쿵! 쿵! 쿵!", "쾅쾅— 쾅!"],
+		["쾅! 쾅! 쾅! 쾅! 쾅—!!", "콰앙—!! 쾅! 쾅!", "쾅쾅쾅쾅— 쾅!!"]][ti]
+	var line_pool: Array = [
+		[
+			"「어이, 방금 그 반대 기사 말인데 — 위에서 안 좋아해. 적당히 하지 그래.」",
+			"「자네, 요즘 논조가 왜 그래? 광고주들 신경 쓰이게 말이야.」",
+			"「그 각(角), 반쯤 접어. 굳이 모르겐社를 긁을 것 없잖나.」",
+			"「모르겐社 홍보실에서 또 전화 왔어. 이봐, 살살 좀 하지.」",
+		],
+		[
+			"「또 그 따위 반대 기사야?! 모르겐社가 위에서 뭐라는지 몰라서 이래?\n한 번만 더 그 논조로 내면 자네 자리도 이 신문도 없어. — 이게 마지막 경고야.」",
+			"「내가 몇 번을 말해! 이건 자네 혼자 내는 신문이 아니야.\n다음에 또 이러면… 알아서 각오해 두라고.」",
+			"「자네 지금 누구 목을 걸고 이러는지 알아? 내 목, 그리고 자네 목이야.\n마지막이다. 알아들었나.」",
+		],
+		[
+			"「기어이 또 냈군. 경고했을 텐데.\n자네 이름은 오늘부로 이 신문에서 지운다. 짐 싸서 나가.」",
+			"「끝이야. 더는 못 봐줘.\n책상 비우고 나가. 자네 하나 때문에 편집국이 다 날아가게 생겼어.」",
+			"「그래, 아주 신념이 대단하셔. 그 신념, 밖에서 실컷 지키라고.\n해고야. 당장 나가.」",
+		]][ti]
+	var vi: int = variant if variant >= 0 else randi()
+	var bang_txt: String = str(bang_pool[vi % bang_pool.size()])
+	var line_txt: String = str(line_pool[vi % line_pool.size()])
+	var layer := Control.new()
+	layer.name = "EditorRage"
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.mouse_filter = Control.MOUSE_FILTER_STOP  # 뒤 게임 입력 차단(닫기 전까지)
+	var scrim := ColorRect.new()
+	scrim.color = Color(0.10, 0.02, 0.02, 0.0)  # 분노 = 어두운 핏빛, 페이드 인
+	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(scrim)
+	# 문 두드림에 울리는 화면 = 이 컨테이너만 흔든다(스크림은 정지 → 검은 틈 없음).
+	var shaker := Control.new()
+	shaker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(shaker)
+	# 비주얼 노벨식: 큰 초상(화면 대부분) + 하단 대사 카드(텍스트 크기는 그대로).
+	# tier별 다른 편집장 초상(없으면 기본 초상으로 폴백).
+	var portrait_tex := _res(str(EDITOR_TIER_PORTRAITS[ti])) as Texture2D
+	if portrait_tex == null:
+		portrait_tex = _res(EDITOR_PORTRAIT) as Texture2D
+	if portrait_tex != null:
+		var pr := TextureRect.new()
+		pr.texture = portrait_tex
+		pr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		pr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pr.clip_contents = true
+		pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pr.offset_left = 96
+		pr.offset_top = 18
+		pr.offset_right = -96
+		pr.offset_bottom = -132  # 하단은 대사 카드 자리로 비운다
+		shaker.add_child(pr)
+	var card := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.03, 0.03, 0.92)
+	sb.set_border_width_all(1)
+	sb.border_color = border_col
+	sb.set_corner_radius_all(4)
+	sb.set_content_margin_all(16)
+	card.add_theme_stylebox_override("panel", sb)
+	shaker.add_child(card)
+	# 하단 중앙에 고정 — 큰 초상 위에 얹는다. 위로 자라며(BEGIN) 폭은 col_w.
+	card.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	card.custom_minimum_size = Vector2(col_w, 0)
+	card.offset_bottom = -20  # 바닥에서 20px 위
+	var cv := VBoxContainer.new()
+	card.add_child(cv)
+	var bang := Label.new()
+	bang.text = bang_txt
+	bang.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bang.add_theme_font_size_override("font_size", 22)
+	bang.add_theme_color_override("font_color", Color(1.0, 0.5, 0.35))
+	cv.add_child(bang)
+	var line := Label.new()
+	line.text = line_txt
+	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	line.add_theme_font_size_override("font_size", 19)
+	line.add_theme_color_override("font_color", Color(0.92, 0.86, 0.8))
+	cv.add_child(line)
+	var hint := Label.new()
+	hint.text = "— 편집장 · (클릭하여 계속)"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_color_override("font_color", Color(0.6, 0.58, 0.54))
+	cv.add_child(hint)
+	_os.add_child(layer)
+	layer.move_to_front()  # 메일이 아니라 강제로 맨 위에
+	layer.modulate = Color(1, 1, 1, 0)
+	# 등장: 스크림 페이드 + 문 두드림 연타(각 타에 흔들림 + editor_knock, tier3 은 붉은 섬광).
+	var tw := create_tween()
+	tw.tween_property(layer, "modulate:a", 1.0, 0.2)
+	tw.parallel().tween_property(scrim, "color:a", base_a, 0.2)
+	for _i in knocks:
+		tw.tween_callback(func() -> void:
+			editor_knock.emit()
+			_knock_shake(shaker, amp)
+			if tier >= 3:
+				scrim.color = Color(0.4, 0.04, 0.03, base_a)  # 순간 붉은 섬광
+				var f := create_tween()
+				f.tween_property(scrim, "color", Color(0.10, 0.02, 0.02, base_a), 0.16))
+		tw.tween_interval(0.24 if tier < 3 else 0.19)
+	# 클릭 시 닫힌다(한 번만). 닫히면 on_close(예: 배신파탄 엔딩) 호출.
+	layer.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed:
+			if bool(layer.get_meta("closing", false)):
+				return
+			layer.set_meta("closing", true)
+			var out := create_tween()
+			out.tween_property(layer, "modulate:a", 0.0, 0.3)
+			out.tween_callback(func() -> void:
+				layer.queue_free()
+				if on_close.is_valid():
+					on_close.call()))
+
+## 문 두드림 한 번: 콘텐츠를 짧고 세게 좌우로 튕긴다(쿵). amp 로 강도 조절.
+func _knock_shake(shaker: Control, amp: float = 1.0) -> void:
+	if shaker == null or not is_instance_valid(shaker):
+		return
+	shaker.position = Vector2.ZERO
+	var t := create_tween()
+	t.tween_property(shaker, "position:x", 14.0 * amp, 0.04).set_trans(Tween.TRANS_SINE)
+	t.tween_property(shaker, "position:x", -10.0 * amp, 0.05).set_trans(Tween.TRANS_SINE)
+	t.tween_property(shaker, "position:x", 0.0, 0.06).set_trans(Tween.TRANS_SINE)
 
 ## 세그먼트 페르소나에 맞는 랜덤 핸들. 같은 base 도 숫자 접미(약 70%)로 변주.
 func _comment_handle(seg: String) -> String:
