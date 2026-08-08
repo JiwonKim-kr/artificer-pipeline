@@ -11,7 +11,7 @@ const TUNING_PATH := "res://src/core/lever_tuning.json"
 # 압박(외압) 암시 문구 — 수치 비표시, 반대 기사 누적에 따른 단계별 노출(스토리 §2.3).
 const PRESSURE_HINTS := {
 	1: "편집장이 당신의 기사를 한참 들여다봤다.",
-	2: "모르겐社 홍보실에서 전화가 왔다더라. 반대 기사는 지면이 줄지도 모른다.",
+	2: "모르겐 사 홍보실에서 전화가 왔다더라. 반대 기사는 지면이 줄지도 모른다.",
 	3: "편집국 앞을 '강철 손'이 서성인다. 이번이 마지막 경고다.",
 }
 const PRESSURE_BREAK := 4  # 반대 기사 누적 임계 → 배신파탄
@@ -28,7 +28,7 @@ var max_turns: int = 8
 var pressure: int = 0  # 반대 스탠스(반대각 기사) 누적 카운터
 var theo_discovered: bool = false  # F15(형 테오) 책상 발견 여부
 var theo_reported: bool = false    # 발견한 형 테오(F15)를 실제로 지면에 실었는가 (후일담 분기)
-# 댓글 반복방어용. model 의 발각 RNG(비트-정확 대조 대상)와 절대 분리한다 — 표현层이라
+# 댓글 반복방어용. model 의 발각 RNG(비트-정확 대조 대상)와 절대 분리한다 — 표현층이라
 # 결정성 불필요, 별도 RNG 로 매 게임 다른 댓글이 나오게 한다.
 var _comment_rng := RandomNumberGenerator.new()
 var _recent_comments: Array = []   # 최근 사용한 댓글 id (쿨다운 큐)
@@ -50,7 +50,7 @@ func _init(seed: int = 1) -> void:
 	tuning = _load_json(TUNING_PATH)
 	model = OpinionModel.new(cfg, seed)
 	max_turns = int((cfg.get("mission", {}) as Dictionary).get("maxTurns", 8))
-	_comment_rng.randomize()  # 댓글은 표현层 — 매 게임 다르게(발각 RNG 와 무관)
+	_comment_rng.randomize()  # 댓글은 표현층 — 매 게임 다르게(발각 RNG 와 무관)
 
 ## 종료 판정: 발각 DETECT_BREAK회+ → 발각파탄 / 압박 누적 → 배신파탄 / 목표 도달 → 성공
 ## / maxTurns 도달 → 실패 / 그 외 진행("").
