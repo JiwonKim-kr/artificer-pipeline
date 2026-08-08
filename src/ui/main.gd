@@ -29,7 +29,6 @@ const MONITOR_FOCUS := Vector2(0.51, 0.35)
 # 'LIE 를 GUIDE 한다'는 이중 의미가 드러난다 (SKYHILL 의 H 점멸 → ILL 강조와 같은 기법).
 const TITLE_TEXT := "GUIDELINE"
 const TITLE_FLICKER_IDX := 7    # 'N' (G0 U1 I2 D3 E4 L5 I6 N7 E8)
-const TITLE_SUB := "치차 석간, 태엽 인간 사건"
 const NEON_ON := Color(1.0, 0.38, 0.22)          # 네온 레드오렌지(디젤펑크 가스관 사인)
 const NEON_GLOW := Color(1.0, 0.30, 0.12, 0.38)  # 글로우(아웃라인)
 const NEON_OFF := Color(0.28, 0.13, 0.10, 0.35)  # 꺼진 관(희미한 유리관 잔상)
