@@ -40,7 +40,7 @@ AI가 생성한 게임 로직을 그대로 믿지 않는다. **오라클(정답 
 
 | 도구 | 용도 | 산출물 (수치) |
 |---|---|---|
-| **Claude / Claude Code** (Anthropic) | 코드·씬 생성(spec→GDScript), 여론 엔진 비트-정확 이식, UI 전체·연출, 파이프라인 스크립트(Python) 작성, 게임 텍스트 생성·문서 | 게임 UI `src/ui/main.gd`(약 1,900줄)·코어 이식 3파일, 파이프라인 스크립트 15종+, 제출 문서 |
+| **Claude / Claude Code** (Anthropic) | 코드·씬 생성(spec→GDScript), 여론 엔진 비트-정확 이식, UI 전체·연출, 파이프라인 스크립트(Python) 작성, 게임 텍스트 생성·문서 | 게임 UI `src/ui/main.gd`(약 2,400줄)·코어 이식 3파일, 파이프라인 스크립트 15종+, 제출 문서 |
 | **FLUX (범용 이미지 모델, Scenario 플랫폼 경유)** | `art concept` — 스타일 확정 전 컨셉 후보 탐색 | 디젤펑크 컨셉 **13종** 생성 → 사람이 선별 |
 | **Scenario (커스텀 스타일 모델 학습·생성)** | `art lock`(선별 컨셉으로 스타일 모델 학습, 2026-08-01 사람 승인) + `art gen` | 스타일 모델 `taeyeop-dieselpunk` 고정(`docs/style_guide.md`), UI 아트 — 책상 배경(점등 변형 포함)·창 프레임·여론계 게이지 |
 | **lore export** (Claude 생성 + 기계 검증) | 세계관(canon) 정합 게임 텍스트 대량 생성 — 스키마·topic 정본·중복·노출 불가 조합을 스크립트(`pipeline/scripts/lore_export.py`)가 차단 | 댓글 뱅크 **87→132건** 확장(세그먼트×반응 셀 전부 11건+, topic 10종 균형) |
@@ -71,7 +71,8 @@ AI가 생성한 게임 로직을 그대로 믿지 않는다. **오라클(정답 
 | 축 | 대신 쓴 것 | 이유 |
 |---|---|---|
 | 여론 엔진 런타임 | 검증된 결정론 모델(bounded-confidence+확증편향+역풍) | 결과가 "그럴듯한 생성"이 아니라 **재현 가능한 창발**이어야 함 |
-| 효과음 9종 | jsfxr 절차 생성(시드 고정) + ffmpeg -16 LUFS 정규화 | 동일 spec → 동일 바이트. 외부 저작권 원천 배제 |
+| 효과음 10종 | jsfxr 절차 생성(시드 고정) + ffmpeg -16 LUFS 정규화 | 동일 spec → 동일 바이트. 외부 저작권 원천 배제 |
+| BGM(앰비언트) 2종 | ffmpeg 절차 합성(`bgm_gen.py` — 전력망 험·핑크노이즈·CRT 편향코일 험, 심리스 루프) | 외부 음원·API 0. 결정적 재현, 라이선스 청정 |
 | 밸런싱 | 몬테카를로 시뮬레이션 **N=4,000** (`balance_montecarlo.mjs`) | "정직만으론 못 이기고, 과욕은 수학적으로 벌받는" 난이도 곡선을 실측으로 확정(`docs/build/c6_balance.md`) |
 | 최종 검수 | 사람 (승인 지점 3곳 생략 불가) | 결정권은 사람에게 |
 
@@ -88,7 +89,8 @@ AI가 생성한 게임 로직을 그대로 믿지 않는다. **오라클(정답 
 | ffmpeg | ffmpeg.org (gyan.dev 빌드) | GPL/LGPL | (개발 도구) 라우드니스 정규화 — 산출 OGG만 게임에 포함, ffmpeg 자체는 미배포 |
 | certifi / Pillow (Python) | PyPI | MPL-2.0 / MIT-CMU | (개발 도구) 파이프라인 스크립트 |
 | **아트 에셋 전부** (배경·창 프레임·게이지·배경 점등 변형) | **자체 생성** — FLUX 컨셉 + Scenario 커스텀 스타일 모델 + GPT Image 2(Scenario 경유, 점등 변형 1종). 생성 도구 §4 명시 | 자체 보유 | 게임 UI 아트 |
-| **효과음 .ogg 9종** | **자체 생성** — jsfxr(재현 spec `pipeline/se_specs/` 커밋) | 자체 보유 | UI/이벤트 SE |
+| **효과음 .ogg 10종** | **자체 생성** — jsfxr(재현 spec `pipeline/se_specs/` 커밋) | 자체 보유 | UI/이벤트 SE |
+| **BGM .ogg 2종** | **자체 생성** — ffmpeg 절차 합성(`pipeline/scripts/bgm_gen.py`, 외부 음원 0) | 자체 보유 | 앰비언트 베드 |
 | **게임 텍스트 전부** (사실·기사·댓글·canon) | **자체 작성/생성** (사람+Claude, §4·§5) | 자체 보유 | 콘텐츠 |
 
 외부 유료 에셋·타인 저작물 사용 없음. 현실 인물·실제 사건 미등장(완전 가상 세계관, `lore/canon/world.md`).

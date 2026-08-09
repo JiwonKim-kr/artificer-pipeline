@@ -9,7 +9,7 @@
 | **플레이 시간** | 1회차 약 15분 내외 (8턴) |
 | **조작** | 마우스 전용 |
 | **팀** | TeamNuN |
-| **플레이 링크(웹)** | `[GitHub Pages URL 삽입]` |
+| **플레이 링크(웹)** | https://jiwonkim-kr.github.io/artificer-pipeline/ |
 | **플레이 영상** | `[YouTube 링크 삽입]` |
 
 ---
@@ -27,7 +27,7 @@
 
 ## 실행 방법
 
-- **웹**: 별도 설치 없이 **플레이 링크 클릭 → 브라우저에서 즉시 플레이** (`[GitHub Pages URL]`). 최신 크롬/엣지/파이어폭스 권장.
+- **웹**: 별도 설치 없이 **플레이 링크 클릭 → 브라우저에서 즉시 플레이** (https://jiwonkim-kr.github.io/artificer-pipeline/). 최신 크롬/엣지/파이어폭스 권장.
 - (로컬 실행) 저장소 `game/gireki-sim` 브랜치를 Godot 4.6.x로 열어 실행. 상세는 `docs/build/gireki_dev_guide.md` §5.
 
 ---

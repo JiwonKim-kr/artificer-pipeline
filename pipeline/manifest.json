@@ -353,6 +353,25 @@
           "action": "generated"
         }
       ]
+    },
+    {
+      "id": "se:ui/editor_knock",
+      "track": "se",
+      "status": "generated",
+      "spec": "편집장 분노 컷신 — 문 두드림(쿵). jsfxr 절차생성(pipeline/se_specs/editor_knock.json).",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::editor_knock"
+        }
+      ],
+      "file": "assets/audio/se/editor_knock.ogg",
+      "history": [
+        {
+          "at": "2026-08-09T11:44:16.145896+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }
