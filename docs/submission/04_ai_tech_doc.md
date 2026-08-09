@@ -46,19 +46,7 @@
 
 **해결**: 정답 기준(오라클)을 별도 계층으로 두고, AI 산출물을 그것과 **기계적으로 대조**한다.
 
-```
-[검증 계층]  sim/opinion-model/*.mjs   ← 여론 확산 모델의 원본 구현 (JS)
-                    │                     · 웹 빌드에서 제외(export exclude_filter)
-                    │                     · 시뮬레이션 러너 + 몬테카를로 밸런싱 도구
-                    │
-       ┌────────────┴────────────┐
-       │  같은 config 파일을 읽음  │  src/core/data/opinion_config.json  ← 단일 출처
-       └────────────┬────────────┘
-                    │
-[런타임 계층]  src/core/opinion_model.gd  ← AI가 비트-정확 이식한 게임 엔진 (GDScript)
-                    ↑
-              opinion_parity_test.gd     ← 두 계층의 출력을 대조하는 테스트
-```
+![2계층 아키텍처 — 검증 계층(sim, JS 오라클)과 런타임 계층(src/core, GDScript)이 같은 config 파일을 단일 출처로 읽고, opinion_parity_test.gd 가 두 계층의 출력을 대조한다](word/img/arch_2layer.png)
 
 **핵심 설계 3가지**
 

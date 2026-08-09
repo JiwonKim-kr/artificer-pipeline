@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle, PageBreak,
+  Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle, PageBreak, ImageRun,
 } = require("docx");
 
 const SRC = process.argv[2];
@@ -21,6 +21,12 @@ const CODE_BG = "F2F2F2";
 
 const PAGE_W = 12240, MARGIN = 1080;          // Letter, 0.75인치 여백
 const CONTENT_W = PAGE_W - MARGIN * 2;
+
+/** PNG 헤더(IHDR)에서 픽셀 크기를 읽는다. 외부 이미지 라이브러리 불필요. */
+function pngSize(file) {
+  const b = fs.readFileSync(file);
+  return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+}
 
 /** 인라인 **굵게** · `코드` 를 TextRun 배열로. */
 function runs(text, opts = {}) {
@@ -109,6 +115,39 @@ function convert(md) {
       while (i < lines.length && /^\|/.test(lines[i])) buf.push(lines[i++]);
       out.push(makeTable(buf));
       out.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+      continue;
+    }
+
+    // 이미지 ![캡션](경로) — 본문 폭에 맞춰 축소, 아래에 캡션
+    const im = line.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
+    if (im) {
+      const abs = path.resolve(path.dirname(SRC), im[2]);
+      if (fs.existsSync(abs)) {
+        const dim = pngSize(abs);
+        const maxW = CONTENT_W;                       // DXA
+        const wEmu = Math.min(dim.w * 9525, maxW * 635); // px→EMU / DXA→EMU
+        const scale = wEmu / (dim.w * 9525);
+        out.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 140, after: 60 },
+          children: [new ImageRun({
+            type: "png",
+            data: fs.readFileSync(abs),
+            transformation: {
+              width: Math.round(dim.w * scale * 0.75),   // EMU→pt(96dpi 기준 px)
+              height: Math.round(dim.h * scale * 0.75),
+            },
+          })],
+        }));
+        if (im[1]) {
+          out.push(new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 180 },
+            children: [new TextRun({ text: im[1], font: BODY, size: 16, color: "666666", italics: true })],
+          }));
+        }
+      }
+      i++;
       continue;
     }
 
