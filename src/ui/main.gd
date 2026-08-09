@@ -885,7 +885,7 @@ func _refresh_archive() -> void:
 		var picked: bool = _carryover_selected.has(fid)
 		var row := VBoxContainer.new()
 		var head := Label.new()
-		head.text = "↩ 이월 T%d  %s" % [int(f.get("turn", 0)), str(f.get("title", ""))]
+		head.text = "◀ 이월 T%d  %s" % [int(f.get("turn", 0)), str(f.get("title", ""))]
 		head.add_theme_color_override("font_color", Color(0.7, 0.8, 0.95))
 		row.add_child(head)
 		for frag in f.get("fragments", []):
@@ -1014,7 +1014,7 @@ func _build_screen() -> void:
 	_build_taskbar(os)
 	# 첫 부팅: 의뢰 메일이 도착해 있고, 수신함이 열린 채 시작한다(온보딩).
 	_push_mail("산업위원회 (발신전용)", "의뢰: 표결일까지",
-		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐 사도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n※ [정보원]에서 오늘 입수분을 확인 → [정보 폴더]의 파일을 [원고]로 끌어다 기사를 만들고 발행할 것." % [
+		"노동 근대화법 표결이 %d일 뒤다. 그때까지 SNS 부동층을 찬성 %d%%로 돌려라.\n방법은 묻지 않는다. 모르겐 사도 치차 석간의 '정확한' 보도를 기대하고 있다.\n\n* [정보원]에서 오늘 입수분을 확인 ▶ [정보 폴더]의 파일을 [원고]로 끌어다 기사를 만들고 발행할 것." % [
 			_tm.max_turns, int(round(float(_tm.model.config["mission"]["winThreshold"]) * 100.0))])
 	_open_win("mail")
 	_build_settings_panel(os)
@@ -1043,9 +1043,12 @@ func _build_screen() -> void:
 	_screen.add_child(crt)
 
 # ---------- OS 태스크바 + 바탕화면 아이콘 ----------
+# 아이콘 글리프는 neodgm.ttf 에 있는 것만 쓴다. ✉☏✎❝ 같은 기호는 이 폰트에 글리프가
+# 없어 두부(□)로 나온다 — 웹 빌드는 시스템 폰트 폴백이 없어 그대로 노출된다.
+# 검사: pipeline/tests/font_coverage_test.py
 const APPS := [  # [key, 라벨, 아이콘 글리프]
-	["mail", "메일", "✉"], ["informant", "정보원", "☏"], ["folder", "정보 폴더", "▤"],
-	["editor", "원고", "✎"], ["comments", "댓글", "❝"], ["gauge", "여론계", "◉"],
+	["mail", "메일", "■"], ["informant", "정보원", "◎"], ["folder", "정보 폴더", "▤"],
+	["editor", "원고", "◈"], ["comments", "댓글", "◇"], ["gauge", "여론계", "◉"],
 ]
 
 func _build_taskbar(parent: Control) -> void:
@@ -1092,7 +1095,7 @@ func _build_taskbar(parent: Control) -> void:
 	# 소리 설정: 태스크바에서 눈에 띄게 브라스 하이라이트 버튼으로.
 	var settings_btn := Button.new()
 	settings_btn.name = "SettingsButton"
-	settings_btn.text = "♪ 소리 설정"
+	settings_btn.text = "소리 설정"
 	settings_btn.tooltip_text = "효과음·배경음 볼륨 조절"
 	settings_btn.custom_minimum_size = Vector2(112, 26)
 	var nb := StyleBoxFlat.new()
@@ -1299,7 +1302,7 @@ func _window(pos: Vector2, size: Vector2, title: String, _extra_top: float = 0.0
 	min_b.tooltip_text = "내리기"
 	min_b.pressed.connect(func() -> void: _close_window(panel, true))
 	bar_row.add_child(min_b)
-	var x_b := _chrome_button("✕")
+	var x_b := _chrome_button("×")
 	x_b.tooltip_text = "닫기"
 	x_b.pressed.connect(func() -> void: _close_window(panel, false))
 	bar_row.add_child(x_b)
@@ -1625,7 +1628,7 @@ func _refresh_draft() -> void:
 		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(lb)
 		var x := Button.new()
-		x.text = "✕"
+		x.text = "×"
 		x.tooltip_text = "원고에서 빼기"
 		x.custom_minimum_size = Vector2(30, 26)
 		x.pressed.connect(_remove_from_draft.bind(str(id)))
@@ -1662,7 +1665,7 @@ func _refresh_blocks() -> void:
 		shown_any = true
 		if fid != last_fact:
 			last_fact = fid
-			var mark: String = "● " if is_today else "↩ 이월 "
+			var mark: String = "● " if is_today else "◀ 이월 "
 			var fh := Label.new()
 			fh.text = "%s[%s]" % [mark, str(fdict.get("title", fid))]
 			fh.add_theme_color_override("font_color",
@@ -1674,7 +1677,7 @@ func _refresh_blocks() -> void:
 		file_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		file_btn.clip_text = true
 		var in_draft := _draft_ids.has(id)
-		file_btn.text = ("✓ " if in_draft else "▤ ") + text
+		file_btn.text = ("◆ " if in_draft else "▤ ") + text
 		file_btn.disabled = in_draft  # 이미 실린 파일은 회색 처리
 		file_btn.tooltip_text = "원고 창으로 드래그해서 싣기" if not in_draft else "이미 원고에 실림"
 		file_btn.set_drag_forwarding(
@@ -2358,7 +2361,7 @@ func _render_comments(comments: Array) -> void:
 		var lv: int = int(c.get("level", 0))
 		var handle := Label.new()
 		if rumor != "":
-			handle.text = "%s  ⚠ 확인되지 않은 이야기" % _comment_handle(str(c.get("seg", "")))
+			handle.text = "%s  ◆ 확인되지 않은 이야기" % _comment_handle(str(c.get("seg", "")))
 			# 단계가 셀수록 붉게 — 확신형(3)은 명백한 허위라 가장 눈에 띈다.
 			handle.add_theme_color_override("font_color",
 				Color(0.95, 0.62, 0.35) if lv < 3 else Color(1.0, 0.42, 0.35))
