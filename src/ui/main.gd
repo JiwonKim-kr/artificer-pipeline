@@ -2180,16 +2180,10 @@ func _show_editor_rage(tier: int = 1, on_close: Callable = Callable(), variant: 
 			on_close.call()
 		return
 	var ti: int = clampi(tier - 1, 0, 2)
-	var knocks: int = [2, 3, 5][ti]
-	var amp: float = [0.7, 1.2, 1.8][ti]
-	var base_a: float = [0.55, 0.82, 0.92][ti]  # tier1 은 옅게(창 팝업 느낌), 위로 갈수록 암전
+	var knocks: int = [1, 2, 3][ti]  # 등장 시 문 두드림 소리 횟수(화면 흔들림 없음)
 	var col_w: float = [480.0, 520.0, 560.0][ti]
 	var border_col: Color = [Color(0.85, 0.62, 0.26), Color(0.9, 0.28, 0.2), Color(1.0, 0.32, 0.24)][ti]
-	# tier별 대사·문 두드림 풀 — 연속 횟수(variant)로 매번 다른 걸 골라 반복감을 줄인다.
-	var bang_pool: Array = [
-		["쿵, 쿵", "똑, 똑, 똑", "쿵 쿵"],
-		["쾅! 쾅! 쾅!", "쿵! 쿵! 쿵!", "쾅 쾅 쾅!"],
-		["쾅! 쾅! 쾅! 쾅! 쾅!", "콰앙! 쾅! 쾅!", "쾅쾅쾅쾅 쾅!"]][ti]
+	# tier별 대사 풀 — 연속 횟수(variant)로 매번 다른 걸 골라 반복감을 줄인다.
 	var line_pool: Array = [
 		[
 			"「어이, 방금 그 반대 기사 말인데. 위에서 안 좋아해. 적당히 하지 그래.」",
@@ -2208,18 +2202,17 @@ func _show_editor_rage(tier: int = 1, on_close: Callable = Callable(), variant: 
 			"「그래, 아주 신념이 대단하셔. 그 신념, 밖에서 실컷 지키라고.\n해고야. 당장 나가.」",
 		]][ti]
 	var vi: int = variant if variant >= 0 else randi()
-	var bang_txt: String = str(bang_pool[vi % bang_pool.size()])
 	var line_txt: String = str(line_pool[vi % line_pool.size()])
 	var layer := Control.new()
 	layer.name = "EditorRage"
 	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.mouse_filter = Control.MOUSE_FILTER_STOP  # 뒤 게임 입력 차단(닫기 전까지)
 	var scrim := ColorRect.new()
-	scrim.color = Color(0.10, 0.02, 0.02, 0.0)  # 분노 = 어두운 핏빛, 페이드 인
+	scrim.color = Color(0, 0, 0, 1)  # 검정 배경(불투명) — layer.modulate 로 페이드 인/아웃
 	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(scrim)
-	# 문 두드림에 울리는 화면 = 이 컨테이너만 흔든다(스크림은 정지 → 검은 틈 없음).
+	# 초상+대사를 담는 컨테이너.
 	var shaker := Control.new()
 	shaker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2257,54 +2250,59 @@ func _show_editor_rage(tier: int = 1, on_close: Callable = Callable(), variant: 
 	card.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	card.custom_minimum_size = Vector2(col_w, 0)
 	card.offset_bottom = -20  # 바닥에서 20px 위
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 카드/대사가 클릭을 먹지 않게 → 어디 클릭이든 layer 가 받음
 	var cv := VBoxContainer.new()
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(cv)
-	var bang := Label.new()
-	bang.text = bang_txt
-	bang.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bang.add_theme_font_size_override("font_size", 22)
-	bang.add_theme_color_override("font_color", Color(1.0, 0.5, 0.35))
-	cv.add_child(bang)
 	var line := Label.new()
 	line.text = line_txt
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_theme_font_size_override("font_size", 19)
 	line.add_theme_color_override("font_color", Color(0.92, 0.86, 0.8))
 	cv.add_child(line)
 	var hint := Label.new()
-	hint.text = "편집장 · 클릭하여 계속"
+	hint.text = "화면을 클릭하여 계속"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint.add_theme_color_override("font_color", Color(0.6, 0.58, 0.54))
 	cv.add_child(hint)
-	_os.add_child(layer)
-	layer.move_to_front()  # 메일이 아니라 강제로 맨 위에
+	add_child(layer)  # OS 안이 아니라 최상단(self) — 화면→책상 전환에도 검정이 유지되게
+	layer.move_to_front()
 	layer.modulate = Color(1, 1, 1, 0)
-	# 등장: 스크림 페이드 + 문 두드림 연타(각 타에 흔들림 + editor_knock, tier3 은 붉은 섬광).
+	_transitioning = true  # 컷신 동안 게임 입력 차단
+	# 등장: 검정 배경 위로 초상+대사가 떠오른다(문 두드림 소리만, 화면 흔들림 없음).
 	var tw := create_tween()
-	tw.tween_property(layer, "modulate:a", 1.0, 0.2)
-	tw.parallel().tween_property(scrim, "color:a", base_a, 0.2)
+	tw.tween_property(layer, "modulate:a", 1.0, 0.5)
 	for _i in knocks:
-		tw.tween_callback(func() -> void:
-			editor_knock.emit()
-			_knock_shake(shaker, amp)
-			if tier >= 3:
-				scrim.color = Color(0.4, 0.04, 0.03, base_a)  # 순간 붉은 섬광
-				var f := create_tween()
-				f.tween_property(scrim, "color", Color(0.10, 0.02, 0.02, base_a), 0.16))
-		tw.tween_interval(0.24 if tier < 3 else 0.19)
-	# 클릭 시 닫힌다(한 번만). 닫히면 on_close(예: 배신파탄 엔딩) 호출.
+		tw.tween_callback(func() -> void: editor_knock.emit())
+		tw.tween_interval(0.3)
+	# 클릭 → 2.5초 여운 → 검정 페이드아웃 → 책상 복귀(배신파탄이면 엔딩).
 	layer.gui_input.connect(func(ev: InputEvent) -> void:
 		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed:
 			if bool(layer.get_meta("closing", false)):
 				return
 			layer.set_meta("closing", true)
-			var out := create_tween()
-			out.tween_property(layer, "modulate:a", 0.0, 0.3)
-			out.tween_callback(func() -> void:
-				layer.queue_free()
+			# 1.5초 페이드아웃(초상+대사 서서히 사라짐) → 순수 검정 → 페이드인 → 책상(배신파탄이면 엔딩).
+			var t := create_tween()
+			t.tween_property(shaker, "modulate:a", 0.0, 1.5)  # 초상+대사만 서서히 사라짐(검정은 유지)
+			t.tween_interval(0.4)                             # 순수 검정 잠깐
+			t.tween_callback(func() -> void:
+				shaker.visible = false
 				if on_close.is_valid():
-					on_close.call()))
+					on_close.call()  # 배신파탄: 엔딩을 검정 뒤에 깔기
+				else:
+					if _screen != null:
+						_screen.visible = false
+					if _desk != null:
+						_desk.visible = true
+						_desk.scale = Vector2.ONE
+					_play_bgm(BGM_ROOM))
+			t.tween_property(layer, "modulate:a", 0.0, 1.5)   # 검정 페이드아웃 = 책상/엔딩 페이드인
+			t.tween_callback(func() -> void:
+				layer.queue_free()
+				_transitioning = false))
 
 ## 문 두드림 한 번: 콘텐츠를 짧고 세게 좌우로 튕긴다(쿵). amp 로 강도 조절.
 func _knock_shake(shaker: Control, amp: float = 1.0) -> void:
