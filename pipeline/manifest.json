@@ -391,6 +391,44 @@
           "action": "generated"
         }
       ]
+    },
+    {
+      "id": "bgm:music/jazz_calm",
+      "track": "bgm",
+      "status": "generated",
+      "spec": "CRT 화면 평시 BGM — 재즈. 외부 음원(Freesound Community / Pixabay 배포본, 사람 제공 2026-08-10). bgm_prep.py 로 앞뒤 무음 트림(66/24ms) + 루프 경계 8ms 페이드 → se_post normalize -20 LUFS 2ch 24kHz. 루프 93.13s.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::BGM_JAZZ"
+        }
+      ],
+      "file": "assets/audio/bgm/jazz_calm.ogg",
+      "history": [
+        {
+          "at": "2026-08-10T01:59:08.718275+00:00",
+          "action": "generated"
+        }
+      ]
+    },
+    {
+      "id": "bgm:music/jazz_crisis",
+      "track": "bgm",
+      "status": "generated",
+      "spec": "CRT 화면 위기 BGM — 어두운 피아노. 편집장 tier2+ 또는 발각 1회 이후 편도 전환. 외부 음원(Freesound Community / Pixabay 배포본, 사람 제공 2026-08-10). bgm_prep.py 로 꼬리 무음 1869ms 트림 + 루프 경계 8ms 페이드 → -20 LUFS 2ch 24kHz. 루프 145.13s.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::BGM_CRISIS"
+        }
+      ],
+      "file": "assets/audio/bgm/jazz_crisis.ogg",
+      "history": [
+        {
+          "at": "2026-08-10T01:59:08.753344+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }

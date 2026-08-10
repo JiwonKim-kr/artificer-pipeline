@@ -19,7 +19,9 @@ const NEWSPAPER_FRAME := "res://assets/art/ui/briefing/newspaper_frame.png"  # �
 # 웹은 사용자 제스처 전 오디오가 차단되므로 타이틀 클릭(_start_game) 이후에만 재생한다.
 const TITLE_BG := "res://assets/art/ui/title/title_bg.png"  # 타이틀 배경(밤의 인쇄소). 없으면 단색 폴백
 const BGM_ROOM := "res://assets/audio/bgm/room_ambient.ogg"  # 타이틀·데스크
-const BGM_CRT := "res://assets/audio/bgm/crt_room.ogg"       # CRT 화면(플레이 루프)
+const BGM_CRT := "res://assets/audio/bgm/crt_room.ogg"       # CRT 화면 — 음악이 없을 때의 폴백
+const BGM_JAZZ := "res://assets/audio/bgm/jazz_calm.ogg"     # CRT 화면 평시
+const BGM_CRISIS := "res://assets/audio/bgm/jazz_crisis.ogg" # CRT 화면 위기(편도)
 const BGM_FADE := 0.6      # 상태 전환 페이드(초)
 const BGM_SILENT_DB := -60.0
 # 데스크 배경에서 모니터 화면의 중심(뷰포트 비율). 줌 인 트랜지션의 초점.
@@ -166,6 +168,7 @@ var _booted: bool = false           # _ready 완료 후 true — 부팅 중 창 
 var _bgm_player: AudioStreamPlayer  # 앰비언트 베드 재생기(BGM 버스). SE 와 달리 상태 기반이라 코드 생성.
 var _bgm_track: String = ""         # 현재 걸린 트랙 경로 — 같은 트랙 재요청은 무시(끊김 방지)
 var _bgm_tween: Tween
+var _crisis: bool = false           # 위기 곡으로 넘어갔는가. 한 번 켜지면 끝까지 유지(편도)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -331,6 +334,25 @@ func _build_bgm_player() -> void:
 	_bgm_player.bus = "BGM"
 	_bgm_player.volume_db = BGM_SILENT_DB
 	add_child(_bgm_player)
+
+## CRT 화면에서 틀 곡. 위기 진입 후에는 되돌아가지 않는다.
+##
+## 왜 편도인가: 이 게임은 압박·발각을 의도적으로 수치로 보여주지 않는다(계기에 눈금이
+## 없고 압박은 문구뿐). 곡이 조건에 따라 오갔다 하면 플레이어가 음악을 게이지로 읽어
+## 숨긴 수치가 새어 나간다. 그래서 (a) 플레이어가 이미 눈으로 본 사건에만 반응하고
+## (b) 한 방향으로만 간다. 되돌릴 수 없다는 주제와도 맞는다.
+func _crt_bgm() -> String:
+	var path: String = BGM_CRISIS if _crisis else BGM_JAZZ
+	# 음악 에셋이 없으면 합성 앰비언트로 폴백(아트·SE 와 같은 원칙).
+	return path if ResourceLoader.exists(path) else BGM_CRT
+
+## 위기 진입 판정. 트리거는 둘 다 화면에 이미 드러난 사건이다 —
+## 편집장이 문 앞까지 온 적 있거나(tier 2+), 왜곡이 한 번이라도 들통났거나.
+func _mark_crisis(editor_tier: int) -> void:
+	if _crisis:
+		return
+	if editor_tier >= 2 or _tm.model.detections.size() > 0:
+		_crisis = true
 
 ## 앰비언트 베드 교체. 같은 트랙이면 무시해 상태를 오갈 때 소리가 끊기지 않게 한다.
 ## 에셋이 없으면 조용히 넘어간다(SE·아트와 같은 폴백 원칙).
@@ -523,7 +545,7 @@ func _enter_screen() -> void:
 			_desk_bg_rect.texture = _desk_bg_default  # 데스크 복귀 대비 원본 복원
 		_screen.visible = true
 		monitor_powered.emit()
-		_play_bgm(BGM_CRT)  # 모니터 앞 — 편향코일 험이 얹힌 베드로 교체
+		_play_bgm(_crt_bgm())  # 모니터 앞 — 평시 재즈 / 위기 진입 후엔 어두운 곡
 		_crt_power_on())
 
 ## CRT 파워온: 암전에서 밝아지며 2번 깜빡 + 스캔라인·색수차가 과했다가 정상치로 안정.
@@ -1892,6 +1914,7 @@ func _on_publish() -> void:
 		editor_tier = 2
 	elif _anti_streak >= 1:
 		editor_tier = 1
+	_mark_crisis(editor_tier)  # 위기 진입은 여기서 한 번만 판정(편도)
 	if bool(result["over"]):
 		if str(result["ending"]) == "배신파탄":
 			var epi := str(result.get("epilogue", ""))
@@ -1914,6 +1937,9 @@ func _on_publish() -> void:
 			if had_article:
 				_show_article()
 			_open_win("comments")
+			# 곡 교체는 여기서 — 편집장이 문을 두드리는 그 순간에 맞물려야 "상황이
+			# 변했다"로 읽힌다. 턴 중간에 바뀌면 이유 없이 튄다.
+			_play_bgm(_crt_bgm())
 			if editor_tier > 0:
 				_show_editor_rage(editor_tier, Callable(), _anti_streak))
 

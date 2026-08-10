@@ -257,6 +257,7 @@ AI 생성물 검증용으로 만든 도구가 잡아낸 사례.
 | wasm-media-encoders 0.7.0 | npm | MIT | WAV 인코딩 (개발 도구) |
 | ffmpeg | ffmpeg.org (gyan.dev 빌드) | GPL/LGPL | 라우드니스 정규화·BGM 합성 (**개발 도구 — 배포물에 미포함**, 산출 OGG만 게임에 포함) |
 | certifi / Pillow (Python) | PyPI | MPL-2.0 / MIT-CMU | 파이프라인 스크립트 (개발 도구) |
+| **BGM 2곡** — `jazz_calm`(평시) / `jazz_crisis`(위기) | Freesound Community (Pixabay 배포본) — 원본 파일명 `freesound_community-modular-spring-jazz-56524` / `freesound_community-dark-loops-000-piano-efect-80-bpm-6329` | **Pixabay License** — 상업적 사용 허용·출처 표기 불요 **[팀 확인 필요: 실제 내려받은 출처가 Pixabay 가 맞는지]** | 게임 내 배경음악 (게임에 번들) |
 
 ## 7.2 자체 생성 에셋 (전부 자체 보유 · 생성 도구 명시)
 
@@ -264,10 +265,10 @@ AI 생성물 검증용으로 만든 도구가 잡아낸 사례.
 |---|---|---|
 | **아트 13종** (책상 배경·점등 변형·창 프레임·여론계·엔딩 4종·편집장 3종·메일·신문 프레임) | FLUX 컨셉 탐색 → **Scenario 커스텀 스타일 모델**(`taeyeop-dieselpunk`) → `art gen`, 일부 **GPT Image 2**(Scenario 경유) 수동 생성 | `pipeline/manifest.json`(각 항목의 생성 명세) · `docs/style_guide.md` |
 | **효과음 10종** | **jsfxr 절차 생성**(시드 고정) + ffmpeg -16 LUFS 정규화 | `pipeline/se_specs/*.json` 커밋 — 동일 시드 → 동일 바이트 |
-| **BGM 2종** | **ffmpeg 절차 합성** (외부 음원 0) | `pipeline/scripts/bgm_gen.py` |
+| **앰비언트 베드 2종** (밤의 편집국·브라운관 앞) | **ffmpeg 절차 합성** (외부 음원 0) | `pipeline/scripts/bgm_gen.py` |
 | **게임 텍스트 전부** (세계관 canon·사실 16종·기사 prose·댓글 143건) | 사람 기획 + Claude 생성 + `lore export` 기계 검증 | `lore/canon/` · `src/core/data/content_slice.json` |
 
-**외부 유료 에셋·타인 저작물 사용 없음.** 현실 인물·실제 사건·실존 기업 미등장 — 완전 가상 세계관(`lore/canon/world.md`).
+**외부 유료 에셋 없음.** 타인 저작물은 위 7.1 의 폰트(SIL OFL)와 BGM 2곡(Pixabay License)뿐이며, 둘 다 재배포·상업적 사용이 허용된 자유 라이선스다. 현실 인물·실제 사건·실존 기업 미등장 — 완전 가상 세계관(`lore/canon/world.md`).
 
 ---
 
