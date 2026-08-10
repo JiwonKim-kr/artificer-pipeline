@@ -340,6 +340,40 @@ def _stage_to_gate(num: int, name: str, stage) -> Gate:
 # ---------------------------------------------------------------------------
 # --full: 러너 자동 발견/실행
 # ---------------------------------------------------------------------------
+# 러너 실패 원인으로 볼 만한 줄. "error 0" 같은 요약 카운트는 잡지 않도록 좁게 둔다.
+_FAILURE_LINE = re.compile(
+    r"\[FAIL\]|Traceback \(most recent call last\)|^\s*\w*(Error|Exception):|^\s*결과: 실패"
+)
+
+
+def _failure_excerpt(stdout: str, stderr: str, *, max_hits: int = 15,
+                     tail_n: int = 8) -> list[str]:
+    """실패한 러너의 출력에서 '왜 실패했는지'가 보이는 줄을 골라 준다.
+
+    꼬리만 찍으면 안 되는 이유: run_se_pipeline 처럼 마지막 섹션이 회귀 검사(전부
+    PASS)로 끝나는 러너는 tail 에 정작 [FAIL] 줄이 안 들어와, CI 로그만 보고는
+    원인을 알 수 없다(실제로 #91 에서 그랬다). 원인 줄을 먼저 뽑고 꼬리를 덧붙인다.
+    """
+    lines = stdout.splitlines()
+    if not lines:
+        return [ln for ln in (stderr or "").strip().splitlines()[-tail_n:]] or ["(출력 없음)"]
+
+    hits = [(i, ln) for i, ln in enumerate(lines) if _FAILURE_LINE.search(ln)]
+    out: list[str] = []
+    if hits:
+        shown = hits[:max_hits]
+        out.append(f"-- 실패 지점 {len(hits)}건" + (f" (앞 {max_hits}건만 표시)"
+                                                    if len(hits) > max_hits else "") + " --")
+        out += [f"L{i + 1}: {ln.strip()}" for i, ln in shown]
+    out.append(f"-- 출력 끝 {tail_n}줄 --")
+    out += lines[-tail_n:]
+    if stderr and stderr.strip():
+        err = stderr.strip().splitlines()
+        out.append("-- stderr --")
+        out += err[-tail_n:]
+    return out
+
+
 def discover_runners(tests_dir: Path, exclude: set[str] | None = None) -> list[Path]:
     """pipeline/tests/run_*.py 러너를 정렬해 반환. exclude 의 파일명은 제외."""
     exclude = exclude or set()
@@ -473,8 +507,7 @@ def main(argv: list[str] | None = None) -> int:
                 badge = "PASS" if ok else "FAIL"
                 print(f"  [{badge}] {rp.name}")
                 if not ok:
-                    tail = "\n".join(proc.stdout.splitlines()[-8:])
-                    for ln in tail.splitlines():
+                    for ln in _failure_excerpt(proc.stdout, proc.stderr):
                         print(f"          {ln}")
 
     # ---- 종합 판정 ----

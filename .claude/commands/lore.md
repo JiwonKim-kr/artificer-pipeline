@@ -1,6 +1,6 @@
 ---
-description: lore 트랙 디스패처 — init/query/check 서브커맨드로 분기
-argument-hint: <init | query <질문> | check> [인자...]
+description: lore 트랙 디스패처 — init/query/check/export 서브커맨드로 분기
+argument-hint: <init | query <질문> | check | export <대상>> [인자...]
 ---
 
 너는 게임 개발 파이프라인의 오케스트레이터다. `/lore <서브커맨드>` 형태의 호출을 받았다.
@@ -14,7 +14,8 @@ argument-hint: <init | query <질문> | check> [인자...]
 - 첫 토큰이 `init` → `.claude/commands/lore-init.md` 의 지침을 읽고 그대로 수행한다.
 - 첫 토큰이 `query` → `.claude/commands/lore-query.md` 의 지침을 읽고, 나머지 토큰을 질문으로 삼아 수행한다.
 - 첫 토큰이 `check` → `.claude/commands/lore-check.md` 의 지침을 읽고 그대로 수행한다.
-- 인자가 비었거나 알 수 없는 토큰이면: 사용 가능한 서브커맨드(`init`, `query <질문>`, `check`)와 각 목적을 한 줄씩 안내하고 멈춘다. 임의 동작을 하지 않는다.
+- 첫 토큰이 `export` → `.claude/commands/lore-export.md` 의 지침을 읽고, 나머지 토큰을 대상으로 삼아 수행한다.
+- 인자가 비었거나 알 수 없는 토큰이면: 사용 가능한 서브커맨드(`init`, `query <질문>`, `check`, `export <대상>`)와 각 목적을 한 줄씩 안내하고 멈춘다. 임의 동작을 하지 않는다.
 
 ## 공통 준수 사항
 
