@@ -372,6 +372,25 @@
           "action": "generated"
         }
       ]
+    },
+    {
+      "id": "art:ui/title/bg",
+      "track": "art",
+      "status": "generated",
+      "spec": "타이틀 화면 배경 — 밤의 인쇄소 홀(좌우 윤전기가 프레임, 중앙은 어둡게 비움). 네온사인(GUIDELINE) 가독성을 위해 중앙 여백을 구도 조건으로 생성. style_guide.md §1 앵커 프롬프트 준수, 텍스트 미포함. 소스 concepts/title_press_00_00.png → 1152x648 lanczos.",
+      "requested_by": [
+        {
+          "kind": "code_event",
+          "path": "src/ui/main.gd::TITLE_BG"
+        }
+      ],
+      "file": "assets/art/ui/title/title_bg.png",
+      "history": [
+        {
+          "at": "2026-08-10T01:22:50.979884+00:00",
+          "action": "generated"
+        }
+      ]
     }
   ]
 }

@@ -17,6 +17,7 @@ const DESK_SEARCH_TEX := "res://assets/art/ui/main/desk_search_closeup.png"
 const NEWSPAPER_FRAME := "res://assets/art/ui/briefing/newspaper_frame.png"  # 브리핑 신문 프레임(9-slice) — art gen 대기, 없으면 크림 폴백
 # 앰비언트 베드(bgm gen 절차 합성, 30s 심리스 루프). 상태별로 갈아 끼운다.
 # 웹은 사용자 제스처 전 오디오가 차단되므로 타이틀 클릭(_start_game) 이후에만 재생한다.
+const TITLE_BG := "res://assets/art/ui/title/title_bg.png"  # 타이틀 배경(밤의 인쇄소). 없으면 단색 폴백
 const BGM_ROOM := "res://assets/audio/bgm/room_ambient.ogg"  # 타이틀·데스크
 const BGM_CRT := "res://assets/audio/bgm/crt_room.ogg"       # CRT 화면(플레이 루프)
 const BGM_FADE := 0.6      # 상태 전환 페이드(초)
@@ -194,9 +195,27 @@ func _build_title() -> void:
 	_title_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_title_view)
 	var bg := ColorRect.new()
-	bg.color = Color(0.045, 0.045, 0.06)  # 밤거리 톤
+	bg.color = Color(0.045, 0.045, 0.06)  # 밤거리 톤 — 배경 아트가 없을 때의 폴백
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_title_view.add_child(bg)
+	# 배경 아트: 밤의 인쇄소. 좌우 윤전기가 프레임을 잡고 중앙이 비어 네온사인 자리가 산다.
+	var bg_tex := _res(TITLE_BG) as Texture2D
+	if bg_tex != null:
+		var bg_rect := TextureRect.new()
+		bg_rect.texture = bg_tex
+		# 16:9 고정 아트라 화면비가 달라도 잘려나갈지언정 여백이 생기지 않게 덮는다.
+		bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bg_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_title_view.add_child(bg_rect)
+		# 원래 배경이 거의 검정이라 네온이 강하게 떴다. 사진을 그대로 두면 대비가 죽으므로
+		# 한 겹 눌러 배경으로 물러나게 한다(사인 가독성 + 밤 톤 유지).
+		var dim := ColorRect.new()
+		dim.color = Color(0.02, 0.02, 0.03, 0.55)
+		dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_title_view.add_child(dim)
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
